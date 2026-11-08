@@ -1,0 +1,158 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Print ledger, after Elvarsel: paper, ink and one signal colour (SL blue); rules
+   instead of cards. Dark mode is near-black so the dark basemap reads as one surface.
+   RGB triplets so Tailwind's /opacity modifiers work. */
+:root {
+  color-scheme: light;
+  --ink-900: 245 243 236; /* page = paper */
+  --ink-800: 250 249 245; /* raised paper (overlays) */
+  --ink-600: 11 37 64; /* active control = solid ink */
+  --fg: 11 37 64;
+  --soft: 40 60 82;
+  --mute: 112 122 132;
+  --line: 11 37 64;
+  --line-alpha: 0.85;
+  --signal: 0 105 180;
+  --on-active: 245 243 236;
+  /* delay buckets (lib.ts bucket()) */
+  --early: 122 79 208;
+  --ontime: 26 127 78;
+  --late: 196 132 0;
+  --verylate: 211 38 30;
+  --grain-opacity: 0.05;
+}
+
+.dark {
+  color-scheme: dark;
+  --ink-900: 12 14 17;
+  --ink-800: 22 25 30;
+  --ink-600: 236 233 224;
+  --fg: 236 233 224;
+  --soft: 208 205 196;
+  --mute: 138 142 148;
+  --line: 236 233 224;
+  --line-alpha: 0.6;
+  --signal: 92 178 255;
+  --on-active: 12 14 17;
+  --early: 179 154 240;
+  --ontime: 76 195 138;
+  --late: 242 193 78;
+  --verylate: 255 90 74;
+  --grain-opacity: 0.07;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: rgb(var(--fg));
+  background-color: rgb(var(--ink-900));
+  font-family: Archivo, system-ui, sans-serif;
+  font-feature-settings: "ss01";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+/* Paper grain over the chrome (not the map: it sits below z-index 50 but the grain
+   is faint enough to read as print on the basemap too). */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  opacity: var(--grain-opacity);
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.dark body::before {
+  mix-blend-mode: screen;
+}
+
+.caps {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+/* Dotted rule (after regards.design's dotted dividers), for secondary separations. */
+.rule-dot {
+  background-image: radial-gradient(circle, rgb(var(--fg) / 0.45) 1px, transparent 1.2px);
+  background-size: 6px 3px;
+  background-repeat: repeat-x;
+  height: 3px;
+}
+@layer utilities {
+  .on-active {
+    color: rgb(var(--on-active));
+  }
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--fg) / 0.25) transparent;
+}
+
+/* ---- bus markers (DOM markers moved by BusMap's animation loop) ---- */
+.bus {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 9999px;
+  border: 2px solid rgb(var(--ink-900));
+  background: rgb(var(--c));
+  color: #fff;
+  font: 600 12px/1 "IBM Plex Mono", ui-monospace, monospace;
+  box-shadow: 0 0 0 1px rgb(var(--fg) / 0.35);
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.2s, background-color 0.4s;
+}
+.dark .bus {
+  color: rgb(12 14 17);
+}
+.bus:hover {
+  transform: scale(1.12);
+}
+.bus:focus-visible,
+.bus[aria-pressed="true"] {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(var(--ink-900)), 0 0 0 4px rgb(var(--fg));
+  z-index: 2;
+}
+@media (max-width: 639px) {
+  .bus {
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+  }
+}
+.bus[data-b="early"] { --c: var(--early); }
+.bus[data-b="ontime"] { --c: var(--ontime); }
+.bus[data-b="late"] { --c: var(--late); }
+.bus[data-b="verylate"] { --c: var(--verylate); }
+
+.maplibregl-ctrl-attrib {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
+  }
+}
