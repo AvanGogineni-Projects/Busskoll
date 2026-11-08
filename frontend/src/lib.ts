@@ -107,5 +107,13 @@ export function relTime(ms: number, now = Date.now()): string {
   return m < 60 ? `${m} min ago` : `${Math.floor(m / 60)} h ago`;
 }
 
+// Departure-board countdown, "now" inside 30 s. Only upcoming stops are shown, so a time
+// already past means the bus is behind its prediction: still "now", never "gone".
+export function dueIn(iso: string, now = Date.now()): string {
+  const s = (Date.parse(iso) - now) / 1000;
+  if (s <= 30) return "now";
+  return `${Math.round(s / 60)} min`;
+}
+
 export const clock = (iso: string) =>
   new Date(iso).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Stockholm" });

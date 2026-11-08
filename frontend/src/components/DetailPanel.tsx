@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { Arrival, StopCall, StopDetail, Vehicle } from "../api";
-import { BUCKET_LABEL, bucket, clock, fmtDelay } from "../lib";
+import { BUCKET_LABEL, bucket, clock, dueIn, fmtDelay } from "../lib";
 
 // Clicked bus or stop: each upcoming arrival as a ledger row, with the timetable, SL's
 // prediction and Busskoll's side by side, each with its delay against the timetable.
@@ -64,7 +64,8 @@ function Shell({ kicker, title, sub, onClose, children }: { kicker: ReactNode; t
           Close
         </button>
       </header>
-      <div className="caps grid grid-cols-3 border-b border-r border-line px-4 py-1.5 text-mute">
+      {/* Departure-board column heads over a heavy rule. */}
+      <div className="caps grid grid-cols-3 border-b-2 border-r border-line px-4 py-1.5 pl-10 text-mute">
         <span>Timetable</span>
         <span>SL</span>
         <span className="text-signal">Busskoll</span>
@@ -81,7 +82,10 @@ function CallRow({ n, title, call }: { n: number; title: ReactNode; call: StopCa
     <div className="border-b border-r border-line px-4 py-2.5">
       <div className="flex items-center gap-2 text-[15px] font-semibold text-fg">
         <span className="caps w-4 text-mute">{n}</span>
-        <span className="flex min-w-0 items-center gap-1.5 truncate">{title}</span>
+        <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate">{title}</span>
+        <span className="shrink-0 font-mono text-[15px] tabular text-signal" title="Due, by Busskoll's prediction">
+          {dueIn(call.busskoll)}
+        </span>
       </div>
       <div className="mt-1.5 grid grid-cols-3 gap-2 pl-6 font-mono text-[13px] tabular">
         <span className="text-soft">{clock(call.scheduled)}</span>
