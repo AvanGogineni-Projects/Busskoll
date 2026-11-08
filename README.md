@@ -42,3 +42,27 @@ cp .env.example .env   # add your Trafiklab keys
 The realtime Bronze key allows 30k calls a month, about one every 90 s. Milestone 1 makes no
 realtime calls. KoDa takes one call per (day, hour) plus one static call per week, and asks
 users to keep only 2–3 downloads running at once; the backfill runs them one at a time.
+
+## Dashboard (`frontend/`)
+
+Vite + React + TypeScript + Tailwind, MapLibre GL on free CARTO vector tiles (no keys). A live
+map of lines 1/4/6 with buses eased along their GTFS shapes, a stop/bus detail panel
+(timetable vs SL vs Busskoll), and the track-record scoreboard.
+
+```bash
+cd frontend && npm install
+npm run dev     # no API on :8000 -> replays one real hour of KoDa (src/fixture.json), dev only
+npm run build && npm run lint && npm run check
+```
+
+The typed client is `src/api.ts` (`/v1/vehicles`, `/v1/routes`, `/v1/stops/{id}`, `/v1/scoreboard`),
+polled at most once a minute. A production build never shows the fixture: with the API down
+it says "Data unavailable". Regenerate the fixture after a backfill (needs the static GTFS
+`routes/trips/shapes/stops.txt` for the week):
+
+```bash
+PYTHONPATH=src .venv/bin/python scripts/export_fixture.py --static data/koda/static/gtfs-2026-11-02 --day 2026-11-03
+```
+
+Until the model exists the fixture's "Busskoll" prediction is the persistence baseline, so the
+demo scoreboard honestly shows SL ahead.
