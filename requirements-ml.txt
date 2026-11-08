@@ -1,0 +1,8 @@
+# Backfill, backtests, training and dev tools.
+#   pip install -e ".[ml]"
+pyarrow>=26
+py7zr>=1.1
+
+# dev
+pytest>=9
+respx>=0.23
