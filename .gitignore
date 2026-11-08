@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.env
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+# raw + processed data (KoDa archives, parquet)
+data/
