@@ -36,3 +36,9 @@ def test_fetch_uses_rt_path_and_key():
         return_value=httpx.Response(200, content=b"pb"))
     assert live.fetch("TripUpdates") == b"pb"
     assert route.calls.last.request.url.params["key"] == "rt-test"
+
+
+def test_parse_drops_stale_trip_updates():
+    pb = make_feed(10_000, [{"trip_id": "OLD", "ts": 10_000 - live.STALE_S - 1, "stops": [(1, "S1", 9000, 0)]},
+                            {"trip_id": "NEW", "ts": 10_000 - live.STALE_S, "stops": [(1, "S1", 10_100, 0)]}])
+    assert live.parse_trip_updates(pb)["trip_id"].tolist() == ["NEW"]

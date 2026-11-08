@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from busskoll.eval import backtest
 
@@ -40,3 +41,20 @@ def test_forecast_points_are_point_in_time_and_score_both_baselines():
     assert (pers, sl) == (16, 24)
     text = backtest.report(pts)
     assert "By horizon" in text and "Already running late" in text
+
+
+def test_load_skips_empty_hours_and_backtest_runs_on_mixed_files(tmp_path):
+    h = history()
+    (tmp_path / "date=2026-11-01").mkdir()
+    pd.DataFrame().to_parquet(tmp_path / "date=2026-11-01" / "hour=03.parquet")  # night hour, no buses
+    h[h.ts < 150].astype({"trip_id": object}).to_parquet(tmp_path / "date=2026-11-01" / "hour=10.parquet")
+    h[h.ts >= 150].to_parquet(tmp_path / "date=2026-11-01" / "hour=11.parquet")
+    df = backtest.load(tmp_path)
+    assert len(df) == len(h)
+    pts = backtest.forecast_points(df, backtest.ground_truth(df))
+    assert len(pts) == 5
+
+
+def test_load_without_data_explains_what_to_run(tmp_path):
+    with pytest.raises(SystemExit, match="busskoll.ingest.koda"):
+        backtest.load(tmp_path)

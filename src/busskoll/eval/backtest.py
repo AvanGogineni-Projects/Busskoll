@@ -82,7 +82,10 @@ def load(root: Path) -> pd.DataFrame:
     files = sorted(root.glob("date=*/hour=*.parquet"))
     if not files:
         raise SystemExit(f"no backfilled data under {root}; run python -m busskoll.ingest.koda first")
-    return pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+    # Hours with no buses are stored as empty, column-less files (they mark the hour done);
+    # mixing them in would turn the key columns into a different string dtype.
+    parts = [d for d in (pd.read_parquet(f) for f in files) if len(d)]
+    return pd.concat(parts, ignore_index=True).astype({k: "str" for k in KEY})
 
 
 def main(argv: list[str] | None = None) -> None:

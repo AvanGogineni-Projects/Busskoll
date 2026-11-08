@@ -68,7 +68,8 @@ def test_backfill_is_resumable_and_skips_corrupt_hours(tmp_path, monkeypatch):
     })
 
     def rt(request):
-        return httpx.Response(200, content=good if request.url.params["hour"] == "10" else b"corrupt")
+        h = request.url.params["hour"]
+        return httpx.Response(202) if h == "11" else httpx.Response(200, content=good if h == "10" else b"corrupt")
 
     static = respx.get(STATIC).mock(return_value=httpx.Response(200, content=gtfs_zip()))
     rt_route = respx.get(RT).mock(side_effect=rt)
@@ -77,10 +78,18 @@ def test_backfill_is_resumable_and_skips_corrupt_hours(tmp_path, monkeypatch):
 
     assert static.calls.last.request.url.params["date"] == "2026-11-02"
     done = sorted(p.name for p in (root / "tripupdates" / "date=2026-11-04").glob("*.parquet"))
-    assert done == ["hour=10.parquet"]  # the 23 corrupt hours are left for the next run
+    assert done == ["hour=10.parquet"]  # the unready hour 11 and 22 corrupt hours are left for the next run
     df = pd.read_parquet(root / "tripupdates" / "date=2026-11-04" / "hour=10.parquet")
     assert df[["trip_id", "line", "delay"]].to_dict("records") == [{"trip_id": "T1", "line": "1", "delay": 30}]
 
     calls = rt_route.call_count
     koda.backfill(DAY, 1, root)  # rerun: hour 10 is skipped, static is cached
-    assert rt_route.call_count == calls + 23 and static.call_count == 1
+    rerun_hours = {c.request.url.params["hour"] for c in rt_route.calls[calls:]}
+    assert rerun_hours == {f"{h:02d}" for h in range(24)} - {"10"} and static.call_count == 1
+
+
+def test_safe_error_text_never_contains_the_key():
+    req = httpx.Request("GET", RT, params={"key": "koda-test"})
+    err = httpx.HTTPStatusError("boom " + str(req.url), request=req, response=httpx.Response(500, request=req))
+    assert koda.safe(err) == "HTTPStatusError 500"
+    assert "koda-test" not in koda.safe(httpx.ConnectError("x " + str(req.url), request=req))

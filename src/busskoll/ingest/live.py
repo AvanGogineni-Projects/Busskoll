@@ -17,6 +17,8 @@ FEEDS = ("TripUpdates", "VehiclePositions", "ServiceAlerts")
 URL = "https://opendata.samtrafiken.se/gtfs-rt/{operator}/{feed}.pb"
 
 COLUMNS = ["ts", "trip_id", "start_date", "vehicle_id", "stop_sequence", "stop_id", "arrival_time", "delay"]
+# A trip update this much older than its snapshot is a ghost (KoDa archives carry some for days).
+STALE_S = 600
 _SKIPPED = gtfs_realtime_pb2.TripUpdate.StopTimeUpdate.SKIPPED
 _NO_DATA = gtfs_realtime_pb2.TripUpdate.StopTimeUpdate.NO_DATA
 
@@ -40,7 +42,8 @@ def parse_trip_updates(pb: bytes, trip_ids: Collection[str] | None = None) -> pd
 
     ts is the trip update's own timestamp (falls back to the feed header). arrival_time is
     SL's predicted (or, once passed, actual) arrival in unix seconds; delay is seconds vs
-    schedule. Stops that are skipped or carry no data are dropped. `trip_ids` filters early
+    schedule. Stops that are skipped or carry no data, and trip updates older than
+    STALE_S, are dropped. `trip_ids` filters early
     so a whole-region snapshot never becomes a whole-region DataFrame.
     """
     msg = gtfs_realtime_pb2.FeedMessage()
@@ -56,6 +59,8 @@ def parse_trip_updates(pb: bytes, trip_ids: Collection[str] | None = None) -> pd
         if trip_ids is not None and tu.trip.trip_id not in trip_ids:
             continue
         ts = tu.timestamp or header_ts
+        if header_ts - ts > STALE_S:
+            continue
         for stu in tu.stop_time_update:
             if stu.schedule_relationship in (_SKIPPED, _NO_DATA):
                 continue
