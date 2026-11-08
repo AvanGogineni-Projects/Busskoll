@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import maplibregl, { type Map as MLMap } from "maplibre-gl";
 import type { Line, Routes, Vehicle, Vehicles } from "../api";
 import { BUCKET_LABEL, bucket, buildShape, distAt, easeInOut, fmtDelay, monotonic, pointAt, type Knot, type Shape } from "../lib";
-import { MAP_PAINT, useTheme } from "../theme";
+import { MAP_PAINT, useTheme, type MapPaint } from "../theme";
 
 export type Selection = { kind: "bus" | "stop"; id: string } | null;
 
@@ -31,6 +31,37 @@ interface Anim {
 const BLEND_MS = 1500;
 const STEP_MS_REDUCED = 5000; // reduced motion: reposition every 5 s, no tweening
 const STOCKHOLM: [number, number] = [18.06, 59.33];
+
+// Re-colour the stock CARTO layers to our palette, by layer id (see their style.json).
+function tint(m: MLMap, p: MapPaint) {
+  const set = (id: string, prop: string, v: unknown) => {
+    try {
+      m.setPaintProperty(id, prop, v);
+    } catch {
+      // a layer missing from this style version: leave it stock
+    }
+  };
+  for (const l of m.getStyle().layers) {
+    const id = l.id;
+    if (l.type === "background") set(id, "background-color", p.land);
+    else if (l.type === "fill") {
+      if (id.startsWith("water")) set(id, "fill-color", p.water);
+      else if (id.startsWith("building")) set(id, "fill-color", p.building);
+      else set(id, "fill-color", p.land2);
+    } else if (l.type === "line") {
+      if (id === "waterway") set(id, "line-color", p.water);
+      else if (id.endsWith("_case") || id.includes("_case_")) set(id, "line-color", p.land);
+      else if (/^(road|bridge|tunnel|rail)/.test(id)) set(id, "line-color", p.road);
+    } else if (l.type === "symbol") {
+      set(id, "text-color", p.label);
+      set(id, "text-halo-color", p.land);
+    }
+  }
+}
+
+// Room for the floating panels, so the routes are framed in the open part of the map.
+const framePadding = () =>
+  window.innerWidth >= 1024 ? { top: 96, bottom: 56, left: 420, right: 48 } : { top: 120, bottom: 190, left: 24, right: 24 };
 
 const sec = (iso: string) => Date.parse(iso) / 1000;
 const trackOf = (v: Vehicle) =>
@@ -68,10 +99,11 @@ export default function BusMap({ routes, vehicles, lines, selected, onSelect, re
       pitchWithRotate: false,
     });
     m.touchZoomRotate.disableRotation();
-    m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
     map.current = m;
     m.on("style.load", () => {
       styleReady.current = true; // first load and every theme switch
+      tint(m, MAP_PAINT[latest.current.theme]);
       addLayers(m);
     });
     m.on("click", (e) => {
@@ -118,9 +150,10 @@ export default function BusMap({ routes, vehicles, lines, selected, onSelect, re
       },
     });
     const round = { "line-join": "round", "line-cap": "round" } as const;
-    m.addLayer({ id: "route-halo", type: "line", source: "routes", layout: round, paint: { "line-color": p.stopFill, "line-width": ["interpolate", ["linear"], ["zoom"], 11, 5, 15, 9], "line-opacity": 0.85 } });
-    m.addLayer({ id: "route", type: "line", source: "routes", layout: round, paint: { "line-color": p.route, "line-width": ["interpolate", ["linear"], ["zoom"], 11, 2, 15, 4], "line-opacity": 0.85 } });
-    m.addLayer({ id: "route-sel", type: "line", source: "routes", layout: round, paint: { "line-color": p.route, "line-width": 4.5 }, filter: ["==", "shape_id", ""] });
+    // Routes as lit tracks: a wide soft glow under a crisp core.
+    m.addLayer({ id: "route-glow", type: "line", source: "routes", layout: round, paint: { "line-color": p.route, "line-width": ["interpolate", ["linear"], ["zoom"], 11, 6, 15, 14], "line-blur": 6, "line-opacity": 0.28 } });
+    m.addLayer({ id: "route", type: "line", source: "routes", layout: round, paint: { "line-color": p.route, "line-width": ["interpolate", ["linear"], ["zoom"], 11, 1.6, 15, 3.5], "line-opacity": 0.9 } });
+    m.addLayer({ id: "route-sel", type: "line", source: "routes", layout: round, paint: { "line-color": p.route, "line-width": ["interpolate", ["linear"], ["zoom"], 11, 4, 15, 7] }, filter: ["==", "shape_id", ""] });
     m.addLayer({
       id: "stops",
       type: "circle",
@@ -141,7 +174,7 @@ export default function BusMap({ routes, vehicles, lines, selected, onSelect, re
       const pts = routes.routes.flatMap((r) => r.shapes.flatMap((s) => s.coords));
       const b = new maplibregl.LngLatBounds(pts[0], pts[0]);
       pts.forEach((pt) => b.extend(pt));
-      m.fitBounds(b, { padding: 40, duration: 0 });
+      m.fitBounds(b, { padding: framePadding(), duration: 0 });
       fitted.current = true;
     }
   }
@@ -152,7 +185,7 @@ export default function BusMap({ routes, vehicles, lines, selected, onSelect, re
     const ls = [...lines];
     const onLine = ["in", ["get", "line"], ["literal", ls]];
     const stopOnLine = ["any", ...ls.map((l) => ["in", l, ["get", "lines"]])];
-    for (const id of ["route-halo", "route"]) m.setFilter(id, onLine as maplibregl.FilterSpecification);
+    for (const id of ["route-glow", "route"]) m.setFilter(id, onLine as maplibregl.FilterSpecification);
     for (const id of ["stops", "stops-hit"]) m.setFilter(id, stopOnLine as maplibregl.FilterSpecification);
     const bus = selected?.kind === "bus" ? anims.current.get(selected.id) : undefined;
     m.setFilter("route-sel", ["==", ["get", "shape_id"], bus?.shapeId ?? ""]);
