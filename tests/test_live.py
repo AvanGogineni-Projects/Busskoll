@@ -1,0 +1,38 @@
+import httpx
+import respx
+from google.transit import gtfs_realtime_pb2 as rt
+
+from busskoll.ingest import live
+from tests.conftest import make_feed
+
+SKIPPED = rt.TripUpdate.StopTimeUpdate.SKIPPED
+
+
+def test_parse_trip_updates_rows_and_filters():
+    pb = make_feed(1000, [
+        {"trip_id": "T1", "vehicle": "v7", "ts": 990, "stops": [
+            (3, "S3", 1100, 45), (4, "S4", 1200, None), (5, "S5", 1300, 60, SKIPPED), (6, "S6", 1400, 50)]},
+        {"trip_id": "T2", "canceled": True, "stops": [(1, "S1", 1100, 0)]},
+        {"trip_id": "TX", "stops": [(1, "S1", 1100, 0)]},
+    ])
+    df = live.parse_trip_updates(pb, {"T1", "T2"})
+    assert df.to_dict("records") == [
+        {"ts": 990, "trip_id": "T1", "start_date": "20261101", "vehicle_id": "v7", "stop_sequence": 3,
+         "stop_id": "S3", "arrival_time": 1100, "delay": 45},
+        {"ts": 990, "trip_id": "T1", "start_date": "20261101", "vehicle_id": "v7", "stop_sequence": 6,
+         "stop_id": "S6", "arrival_time": 1400, "delay": 50},
+    ]
+
+
+def test_parse_falls_back_to_header_timestamp_and_handles_empty():
+    df = live.parse_trip_updates(make_feed(1000, [{"trip_id": "T1", "stops": [(1, "S1", 1100, 5)]}]))
+    assert df["ts"].tolist() == [1000]
+    assert live.parse_trip_updates(make_feed(1000, [])).empty
+
+
+@respx.mock
+def test_fetch_uses_rt_path_and_key():
+    route = respx.get("https://opendata.samtrafiken.se/gtfs-rt/sl/TripUpdates.pb").mock(
+        return_value=httpx.Response(200, content=b"pb"))
+    assert live.fetch("TripUpdates") == b"pb"
+    assert route.calls.last.request.url.params["key"] == "rt-test"
