@@ -9,7 +9,24 @@ Live delay predictions for Stockholm (SL) blue bus lines 1, 4 and 6, built on Tr
 - [x] Live GTFS-RT fetch + TripUpdates parser (`busskoll.ingest.live`)
 - [x] Resumable KoDa backfill (`busskoll.ingest.koda`)
 - [x] Walk-forward backtest of both baselines (`busskoll.eval.backtest`)
-- [ ] First baseline numbers on real history (needs `KODA_KEY`)
+- [x] First baseline numbers on real history ([reports/baselines.md](reports/baselines.md))
+
+## Baselines to beat (14 days, Oct 25 – Nov 7 2026, lines 1/4/6)
+
+MAE in seconds over 1.3M forecasts (each one 1–5 stops ahead):
+
+| Stops ahead | Persistence | SL's own prediction |
+|---|---|---|
+| 1 | 65.7 | **33.4** |
+| 3 | 77.2 | **41.4** |
+| 5 | 94.9 | **56.1** |
+| All | 75.1 | **40.1** |
+
+SL halves persistence's error on every line and every day, so the model has to get under
+~40 s. Caveat: the "actual" arrival is SL's last report at the stop, which favours SL at
+short range; GPS-derived arrivals (VehiclePositions) are the independent check, planned later.
+Data gaps: 18 Nov 2 hours are truncated archives on KoDa's side, and some Nov 7 hours were
+not yet prepared.
 
 ## How it works
 
