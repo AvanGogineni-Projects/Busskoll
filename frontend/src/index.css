@@ -2,125 +2,114 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Print ledger, after Elvarsel: paper, ink and one signal colour (SL blue); rules
-   instead of cards. Dark mode is near-black so the dark basemap reads as one surface.
+/* Night transit control room: the map is the page; instruments float over it.
+   Electric blåbuss blue is Busskoll, cool slate is SL, amber LED is the departure board.
    RGB triplets so Tailwind's /opacity modifiers work. */
 :root {
   color-scheme: light;
-  --ink-900: 245 243 236; /* page = paper */
-  --ink-800: 250 249 245; /* raised paper (overlays) */
-  --ink-600: 11 37 64; /* active control = solid ink */
-  --fg: 11 37 64;
-  --soft: 40 60 82;
-  --mute: 112 122 132;
-  --line: 11 37 64;
-  --line-alpha: 0.85;
-  --signal: 0 105 180;
-  --on-active: 245 243 236;
-  /* delay buckets (lib.ts bucket()) */
-  --early: 122 79 208;
-  --ontime: 26 127 78;
-  --late: 196 132 0;
-  --verylate: 211 38 30;
-  --grain-opacity: 0.05;
+  --bg: 233 237 242;
+  --panel: 255 255 255;
+  --raise: 243 245 249;
+  --edge: 15 23 42;
+  --fg: 11 18 32;
+  --soft: 51 65 85;
+  --mute: 100 116 139;
+  --accent: 31 95 224;
+  --rival: 148 163 184;
+  --led: 255 176 32;
+  --board: 11 18 32;
+  --board-fg: 230 237 247;
+  --board-mute: 120 135 160;
+  --early: 8 145 178;
+  --ontime: 22 163 74;
+  --late: 234 120 30;
+  --verylate: 225 29 72;
+  --edge-a: 0.1;
 }
 
 .dark {
   color-scheme: dark;
-  --ink-900: 12 14 17;
-  --ink-800: 22 25 30;
-  --ink-600: 236 233 224;
-  --fg: 236 233 224;
-  --soft: 208 205 196;
-  --mute: 138 142 148;
-  --line: 236 233 224;
-  --line-alpha: 0.6;
-  --signal: 92 178 255;
-  --on-active: 12 14 17;
-  --early: 179 154 240;
-  --ontime: 76 195 138;
-  --late: 242 193 78;
-  --verylate: 255 90 74;
-  --grain-opacity: 0.07;
+  --bg: 7 11 20;
+  --panel: 14 21 36;
+  --raise: 22 31 50;
+  --edge: 255 255 255;
+  --fg: 230 237 247;
+  --soft: 186 198 216;
+  --mute: 128 144 168;
+  --accent: 86 150 255;
+  --rival: 120 135 160;
+  --led: 255 176 32;
+  --board: 4 7 13;
+  --early: 103 200 255;
+  --ontime: 61 220 151;
+  --late: 255 145 64;
+  --verylate: 255 77 109;
+  --edge-a: 0.09;
 }
 
 html,
 body,
 #root {
-  min-height: 100%;
+  height: 100%;
 }
 
 body {
   margin: 0;
   color: rgb(var(--fg));
-  background-color: rgb(var(--ink-900));
-  font-family: Archivo, system-ui, sans-serif;
-  font-feature-settings: "ss01";
+  background-color: rgb(var(--bg));
+  font-family: "Instrument Sans", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-  overflow-x: hidden;
+  overflow: hidden; /* the map is the page; panels scroll inside themselves */
 }
 
-/* Paper grain over the chrome (not the map: it sits below z-index 50 but the grain
-   is faint enough to read as print on the basemap too). */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 50;
-  opacity: var(--grain-opacity);
-  mix-blend-mode: multiply;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-.dark body::before {
-  mix-blend-mode: screen;
-}
-
-.caps {
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
 .tabular {
   font-variant-numeric: tabular-nums;
 }
-/* Dotted rule (after regards.design's dotted dividers), for secondary separations. */
-.rule-dot {
-  background-image: radial-gradient(circle, rgb(var(--fg) / 0.45) 1px, transparent 1.2px);
-  background-size: 6px 3px;
-  background-repeat: repeat-x;
-  height: 3px;
+.label {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
-@layer utilities {
-  .on-active {
-    color: rgb(var(--on-active));
-  }
+/* Floating instrument panel. */
+.glass {
+  background: rgb(var(--panel) / 0.92);
+  border: 1px solid rgb(var(--edge) / var(--edge-a));
+  border-radius: 14px;
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 16px 40px -16px rgb(0 0 0 / 0.5);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+}
+.hairline {
+  border-color: rgb(var(--edge) / var(--edge-a));
+}
+/* LED glow on dot-matrix figures. */
+.led {
+  font-family: Doto, "JetBrains Mono", monospace;
+  font-weight: 900;
+  color: rgb(var(--led));
+  text-shadow: 0 0 10px rgb(var(--led) / 0.45);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgb(var(--fg) / 0.25) transparent;
+  scrollbar-color: rgb(var(--mute) / 0.4) transparent;
 }
 
 /* ---- bus markers (DOM markers moved by BusMap's animation loop) ---- */
 .bus {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 9999px;
-  border: 2px solid rgb(var(--ink-900));
-  background: rgb(var(--c));
-  color: #fff;
-  font: 600 12px/1 "IBM Plex Mono", ui-monospace, monospace;
-  box-shadow: 0 0 0 1px rgb(var(--fg) / 0.35);
+  background: rgb(var(--panel));
+  border: 2.5px solid rgb(var(--c));
+  color: rgb(var(--c));
+  font: 700 12px/1 "JetBrains Mono", ui-monospace, monospace;
+  box-shadow: 0 0 0 3px rgb(var(--c) / 0.18), 0 4px 12px rgb(0 0 0 / 0.35);
   cursor: pointer;
-  transition: box-shadow 0.2s, transform 0.2s, background-color 0.4s;
-}
-.dark .bus {
-  color: rgb(12 14 17);
+  transition: transform 0.2s, background-color 0.3s, color 0.3s, border-color 0.4s;
 }
 .bus:hover {
   transform: scale(1.12);
@@ -128,13 +117,15 @@ body::before {
 .bus:focus-visible,
 .bus[aria-pressed="true"] {
   outline: none;
-  box-shadow: 0 0 0 2px rgb(var(--ink-900)), 0 0 0 4px rgb(var(--fg));
+  background: rgb(var(--c));
+  color: rgb(var(--panel));
+  box-shadow: 0 0 0 4px rgb(var(--c) / 0.35), 0 0 22px rgb(var(--c) / 0.6);
   z-index: 2;
 }
 @media (max-width: 639px) {
   .bus {
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     font-size: 11px;
   }
 }
@@ -144,7 +135,7 @@ body::before {
 .bus[data-b="verylate"] { --c: var(--verylate); }
 
 .maplibregl-ctrl-attrib {
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 10px !important;
 }
 

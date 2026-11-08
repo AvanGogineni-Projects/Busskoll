@@ -2,8 +2,9 @@ import type { ReactNode } from "react";
 import type { Arrival, StopCall, StopDetail, Vehicle } from "../api";
 import { BUCKET_LABEL, bucket, clock, dueIn, fmtDelay } from "../lib";
 
-// Clicked bus or stop: each upcoming arrival as a ledger row, with the timetable, SL's
-// prediction and Busskoll's side by side, each with its delay against the timetable.
+// Clicked bus or stop, as a departure board: dark in both themes like real signage, with
+// amber dot-matrix countdowns. Each row sets the timetable, SL's prediction and Busskoll's
+// side by side, each with its delay against the timetable.
 interface Props {
   vehicle?: Vehicle;
   stop?: { detail: StopDetail | null; error: boolean; name?: string };
@@ -13,108 +14,109 @@ interface Props {
 export default function DetailPanel({ vehicle, stop, onClose }: Props) {
   if (vehicle) {
     return (
-      <Shell
-        kicker={<>Bus {vehicle.vehicle_id.slice(-4)} · <Chip delay={vehicle.delay_s} long /></>}
-        title={<><Badge line={vehicle.line} /> {vehicle.headsign}</>}
-        sub={`Passed ${vehicle.last_stop.name || "last stop"} at ${clock(vehicle.last_stop.time)}`}
+      <Board
+        kicker={<>Bus {vehicle.vehicle_id.slice(-4)} · passed {vehicle.last_stop.name || "last stop"} {clock(vehicle.last_stop.time)}</>}
+        title={<><Badge line={vehicle.line} /> <span className="truncate">{vehicle.headsign}</span></>}
+        status={<Chip delay={vehicle.delay_s} long />}
         onClose={onClose}
       >
         {vehicle.next_stops.length ? (
-          vehicle.next_stops.map((c, i) => <CallRow key={c.stop_id + i} n={i + 1} title={c.name} call={c} />)
+          vehicle.next_stops.map((c, i) => <Row key={c.stop_id + i} title={c.name} call={c} />)
         ) : (
           <Empty>No upcoming stops: the trip is ending.</Empty>
         )}
-      </Shell>
+      </Board>
     );
   }
-  if (stop) {
-    const d = stop.detail;
-    return (
-      <Shell
-        kicker={<>Stop{d ? ` · lines ${d.stop.lines.join(", ")}` : ""}</>}
-        title={d?.stop.name ?? stop.name ?? "…"}
-        sub="Buses due within their next 5 stops"
-        onClose={onClose}
-      >
-        {stop.error ? (
-          <Empty>Couldn't load this stop. It retries with the next update.</Empty>
-        ) : !d ? (
-          <div className="h-40 animate-pulse bg-fg/[0.04]" />
-        ) : d.arrivals.length ? (
-          d.arrivals.map((a, i) => <CallRow key={a.trip_id} n={i + 1} title={<><Badge line={a.line} /> {a.headsign}</>} call={a} />)
-        ) : (
-          <Empty>No bus due here in the next few stops.</Empty>
-        )}
-      </Shell>
-    );
-  }
-  return null;
+  if (!stop) return null;
+  const d = stop.detail;
+  return (
+    <Board
+      kicker={<>Stop{d ? ` · lines ${d.stop.lines.join(" · ")}` : ""} · buses due within 5 stops</>}
+      title={<span className="truncate">{d?.stop.name ?? stop.name ?? "…"}</span>}
+      onClose={onClose}
+    >
+      {stop.error ? (
+        <Empty>Couldn't load this stop. It retries with the next update.</Empty>
+      ) : !d ? (
+        <div className="m-3 h-32 animate-pulse rounded-lg bg-white/[0.04]" />
+      ) : d.arrivals.length ? (
+        d.arrivals.map((a) => <Row key={a.trip_id} title={<><Badge line={a.line} /> <span className="truncate">{a.headsign}</span></>} call={a} />)
+      ) : (
+        <Empty>No bus due here in the next few stops.</Empty>
+      )}
+    </Board>
+  );
 }
 
-function Shell({ kicker, title, sub, onClose, children }: { kicker: ReactNode; title: ReactNode; sub: string; onClose: () => void; children: ReactNode }) {
+function Board({ kicker, title, status, onClose, children }: { kicker: ReactNode; title: ReactNode; status?: ReactNode; onClose: () => void; children: ReactNode }) {
   return (
-    <section className="border-l border-t border-line" aria-live="polite" aria-label="Selection detail">
-      <header className="flex items-start justify-between gap-3 border-b border-r border-line px-4 py-3">
+    <section className="overflow-hidden rounded-panel border border-white/10 bg-board text-board-fg shadow-float" aria-live="polite" aria-label="Departure board">
+      <header className="flex items-start justify-between gap-3 px-4 pb-3 pt-3.5">
         <div className="min-w-0">
-          <div className="caps text-mute">{kicker}</div>
-          <h2 className="mt-1 flex items-center gap-2 text-[22px] font-extrabold leading-tight tracking-[-0.02em] text-fg">{title}</h2>
-          <div className="caps mt-1 text-mute">{sub}</div>
+          <div className="label truncate text-board-mute">{kicker}</div>
+          <h2 className="mt-1.5 flex min-w-0 items-center gap-2 text-[22px] font-semibold leading-tight tracking-tight">{title}</h2>
+          {status && <div className="mt-1.5">{status}</div>}
         </div>
-        <button onClick={onClose} aria-label="Close detail" className="caps shrink-0 border border-line px-2 py-1 text-fg transition-colors hover:bg-ink-600 hover:on-active">
-          Close
+        <button
+          onClick={onClose}
+          aria-label="Close departure board"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/[0.06] text-board-mute transition-colors hover:bg-white/[0.12] hover:text-board-fg"
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
         </button>
       </header>
-      {/* Departure-board column heads over a heavy rule. */}
-      <div className="caps grid grid-cols-3 border-b-2 border-r border-line px-4 py-1.5 pl-10 text-mute">
+      <div className="label grid grid-cols-3 gap-2 border-y border-white/[0.08] px-4 py-1.5 text-board-mute">
         <span>Timetable</span>
         <span>SL</span>
-        <span className="text-signal">Busskoll</span>
+        <span className="text-[rgb(86_150_255)]">Busskoll</span>
       </div>
-      {children}
+      <div className="divide-y divide-white/[0.06]">{children}</div>
     </section>
   );
 }
 
-function CallRow({ n, title, call }: { n: number; title: ReactNode; call: StopCall | Arrival }) {
+function Row({ title, call }: { title: ReactNode; call: StopCall | Arrival }) {
   const s = Date.parse(call.scheduled);
   const delay = (iso: string) => (Date.parse(iso) - s) / 1000;
   return (
-    <div className="border-b border-r border-line px-4 py-2.5">
-      <div className="flex items-center gap-2 text-[15px] font-semibold text-fg">
-        <span className="caps w-4 text-mute">{n}</span>
-        <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate">{title}</span>
-        <span className="shrink-0 font-mono text-[15px] tabular text-signal" title="Due, by Busskoll's prediction">
+    <div className="px-4 py-2.5">
+      <div className="flex items-center gap-3">
+        <span className="flex min-w-0 flex-1 items-center gap-2 text-[15px] font-medium">{title}</span>
+        <span className="led shrink-0 text-[22px] leading-none tabular" title="Due, by Busskoll's prediction">
           {dueIn(call.busskoll)}
         </span>
       </div>
-      <div className="mt-1.5 grid grid-cols-3 gap-2 pl-6 font-mono text-[13px] tabular">
-        <span className="text-soft">{clock(call.scheduled)}</span>
-        <span className="flex flex-wrap items-center gap-x-1.5 text-fg">
-          {clock(call.sl)} <Chip delay={delay(call.sl)} />
+      <div className="mt-1.5 grid grid-cols-3 gap-2 font-mono text-[12.5px] tabular">
+        <span className="text-board-mute">{clock(call.scheduled)}</span>
+        <span className="flex flex-wrap items-center gap-x-1.5">
+          {clock(call.sl)} <Chip delay={delay(call.sl)} board />
         </span>
-        <span className="flex flex-wrap items-center gap-x-1.5 font-semibold text-fg">
-          {clock(call.busskoll)} <Chip delay={delay(call.busskoll)} />
+        <span className="flex flex-wrap items-center gap-x-1.5 font-semibold">
+          {clock(call.busskoll)} <Chip delay={delay(call.busskoll)} board />
         </span>
       </div>
     </div>
   );
 }
 
+// On the always-dark board the chips use the dark-theme delay colours, whatever the page theme.
 const CHIP = { early: "text-early", ontime: "text-ontime", late: "text-late", verylate: "text-verylate" } as const;
-export function Chip({ delay, long }: { delay: number; long?: boolean }) {
+const BOARD_CHIP = { early: "text-[#67c8ff]", ontime: "text-[#3ddc97]", late: "text-[#ff9140]", verylate: "text-[#ff4d6d]" } as const;
+export function Chip({ delay, long, board = long }: { delay: number; long?: boolean; board?: boolean }) {
   const b = bucket(delay);
   return (
-    <span className={`caps inline-flex items-center gap-1 ${CHIP[b]}`} title={BUCKET_LABEL[b]}>
+    <span className={`inline-flex items-center gap-1 font-mono text-[11px] ${(board ? BOARD_CHIP : CHIP)[b]}`} title={BUCKET_LABEL[b]}>
       <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
-      {long ? `${BUCKET_LABEL[b]} ${fmtDelay(delay)}` : fmtDelay(delay)}
+      {long ? `${BUCKET_LABEL[b]} · ${fmtDelay(delay)}` : fmtDelay(delay)}
     </span>
   );
 }
 
 export const Badge = ({ line }: { line: string }) => (
-  <span className="inline-grid h-6 min-w-6 shrink-0 place-items-center bg-signal px-1 font-mono text-[13px] font-semibold leading-none text-white dark:text-[#0c0e11]" aria-label={`Line ${line}`}>
+  <span className="inline-grid h-6 min-w-6 shrink-0 place-items-center rounded-md bg-[#1f5fe0] px-1.5 font-mono text-[13px] font-bold leading-none text-white" aria-label={`Line ${line}`}>
     {line}
   </span>
 );
 
-const Empty = ({ children }: { children: ReactNode }) => <p className="caps border-b border-r border-line px-4 py-4 text-mute">{children}</p>;
+const Empty = ({ children }: { children: ReactNode }) => <p className="px-4 py-4 text-sm text-board-mute">{children}</p>;

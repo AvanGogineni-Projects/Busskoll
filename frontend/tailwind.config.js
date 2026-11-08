@@ -1,4 +1,5 @@
 /** @type {import('tailwindcss').Config} */
+const v = (name) => `rgb(var(--${name}) / <alpha-value>)`;
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   darkMode: "class", // theme.tsx toggles .dark on <html>
@@ -6,27 +7,31 @@ export default {
     extend: {
       // Every colour is a CSS variable (index.css), so the same classes serve light and dark.
       colors: {
-        ink: {
-          900: "rgb(var(--ink-900) / <alpha-value>)",
-          800: "rgb(var(--ink-800) / <alpha-value>)",
-          600: "rgb(var(--ink-600) / <alpha-value>)",
-        },
-        fg: "rgb(var(--fg) / <alpha-value>)",
-        line: "rgb(var(--line) / var(--line-alpha))",
-        mute: "rgb(var(--mute) / <alpha-value>)",
-        soft: "rgb(var(--soft) / <alpha-value>)",
-        signal: "rgb(var(--signal) / <alpha-value>)",
-        early: "rgb(var(--early) / <alpha-value>)",
-        ontime: "rgb(var(--ontime) / <alpha-value>)",
-        late: "rgb(var(--late) / <alpha-value>)",
-        verylate: "rgb(var(--verylate) / <alpha-value>)",
+        bg: v("bg"),
+        panel: v("panel"),
+        raise: v("raise"),
+        edge: v("edge"),
+        fg: v("fg"),
+        soft: v("soft"),
+        mute: v("mute"),
+        accent: v("accent"),
+        rival: v("rival"), // SL's colour in head-to-head charts
+        led: v("led"),
+        board: v("board"), // departure board: dark in both themes, like real signage
+        "board-fg": v("board-fg"),
+        "board-mute": v("board-mute"),
+        early: v("early"),
+        ontime: v("ontime"),
+        late: v("late"),
+        verylate: v("verylate"),
       },
       fontFamily: {
-        sans: ["Archivo", "system-ui", "sans-serif"],
-        mono: ["'IBM Plex Mono'", "ui-monospace", "SFMono-Regular", "monospace"],
+        sans: ["'Instrument Sans'", "system-ui", "sans-serif"],
+        mono: ["'JetBrains Mono'", "ui-monospace", "SFMono-Regular", "monospace"],
+        dot: ["Doto", "'JetBrains Mono'", "monospace"],
       },
-      // Print ledger: square corners everywhere (dots stay round via rounded-full).
-      borderRadius: { none: "0", DEFAULT: "0", sm: "0", md: "0", lg: "0", xl: "0", full: "9999px" },
+      borderRadius: { panel: "14px" },
+      boxShadow: { float: "0 1px 0 rgb(255 255 255 / 0.04) inset, 0 12px 40px -12px rgb(0 0 0 / 0.45)" },
     },
   },
   plugins: [],
