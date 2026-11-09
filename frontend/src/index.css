@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Night transit control room: the map is the page; instruments float over it.
+/* Night transit control room as a docked web app: header, KPI strip, map pane, inspector.
    Electric blåbuss blue is Busskoll, cool slate is SL, amber LED is the departure board.
    RGB triplets so Tailwind's /opacity modifiers work. */
 :root {
@@ -24,7 +24,7 @@
   --ontime: 22 163 74;
   --late: 234 120 30;
   --verylate: 225 29 72;
-  --edge-a: 0.1;
+  --edge-a: 0.12;
 }
 
 .dark {
@@ -44,7 +44,7 @@
   --ontime: 61 220 151;
   --late: 255 145 64;
   --verylate: 255 77 109;
-  --edge-a: 0.09;
+  --edge-a: 0.1;
 }
 
 html,
@@ -59,7 +59,7 @@ body {
   background-color: rgb(var(--bg));
   font-family: "Instrument Sans", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
-  overflow: hidden; /* the map is the page; panels scroll inside themselves */
+  overflow-x: hidden; /* desktop locks the shell to the viewport in App; phones scroll */
 }
 
 .tabular {
@@ -71,15 +71,7 @@ body {
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-/* Floating instrument panel. */
-.glass {
-  background: rgb(var(--panel) / 0.92);
-  border: 1px solid rgb(var(--edge) / var(--edge-a));
-  border-radius: 14px;
-  box-shadow: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 16px 40px -16px rgb(0 0 0 / 0.5);
-  backdrop-filter: blur(14px) saturate(1.2);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
-}
+/* Docked app chrome: hairline borders between regions, no floating cards. */
 .hairline {
   border-color: rgb(var(--edge) / var(--edge-a));
 }

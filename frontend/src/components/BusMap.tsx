@@ -59,10 +59,6 @@ function tint(m: MLMap, p: MapPaint) {
   }
 }
 
-// Room for the floating panels, so the routes are framed in the open part of the map.
-const framePadding = () =>
-  window.innerWidth >= 1024 ? { top: 96, bottom: 56, left: 420, right: 48 } : { top: 120, bottom: 190, left: 24, right: 24 };
-
 const sec = (iso: string) => Date.parse(iso) / 1000;
 const trackOf = (v: Vehicle) =>
   monotonic([{ t: sec(v.last_stop.time), d: v.last_stop.dist_m }, ...v.next_stops.map((c) => ({ t: sec(c.busskoll), d: c.dist_m }))]);
@@ -99,7 +95,7 @@ export default function BusMap({ routes, vehicles, lines, selected, onSelect, re
       pitchWithRotate: false,
     });
     m.touchZoomRotate.disableRotation();
-    m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+    m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     map.current = m;
     m.on("style.load", () => {
       styleReady.current = true; // first load and every theme switch
@@ -112,8 +108,12 @@ export default function BusMap({ routes, vehicles, lines, selected, onSelect, re
     });
     m.on("mouseenter", "stops-hit", () => (m.getCanvas().style.cursor = "pointer"));
     m.on("mouseleave", "stops-hit", () => (m.getCanvas().style.cursor = ""));
+    // MapLibre only tracks window resizes; the docked pane also resizes with the layout.
+    const ro = new ResizeObserver(() => m.resize());
+    ro.observe(box.current!);
     const store = anims.current;
     return () => {
+      ro.disconnect();
       store.forEach((a) => a.marker.remove());
       store.clear();
       m.remove();
@@ -169,12 +169,13 @@ export default function BusMap({ routes, vehicles, lines, selected, onSelect, re
     // Invisible, finger-sized hit area for stops.
     m.addLayer({ id: "stops-hit", type: "circle", source: "stops", paint: { "circle-radius": 14, "circle-opacity": 0 } });
     applyFilters(m);
-    if (!fitted.current) {
+    if (!fitted.current && m.getContainer().clientHeight > 0) {
+      m.resize(); // frame against the pane's real size, not the size at construction
       // Frame the three routes (after style load: an earlier camera move can be overridden).
       const pts = routes.routes.flatMap((r) => r.shapes.flatMap((s) => s.coords));
       const b = new maplibregl.LngLatBounds(pts[0], pts[0]);
       pts.forEach((pt) => b.extend(pt));
-      m.fitBounds(b, { padding: framePadding(), duration: 0 });
+      m.fitBounds(b, { padding: 32, duration: 0 });
       fitted.current = true;
     }
   }
@@ -265,6 +266,15 @@ export default function BusMap({ routes, vehicles, lines, selected, onSelect, re
     }
     if (map.current) applyFilters(map.current);
   }, [lines, selected, vehicles]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A bus picked from the fleet table may be off screen: bring it into view.
+  useEffect(() => {
+    const m = map.current;
+    const a = selected?.kind === "bus" ? anims.current.get(selected.id) : undefined;
+    if (!m || !a) return;
+    const at = a.marker.getLngLat();
+    if (!m.getBounds().contains(at)) m.easeTo({ center: at, duration: reduced ? 0 : 600 });
+  }, [selected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- animation loop ------------------------------------------------------------
   useEffect(() => {

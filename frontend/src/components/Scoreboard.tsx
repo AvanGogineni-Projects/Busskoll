@@ -4,7 +4,7 @@ import AnimatedNumber from "./AnimatedNumber";
 
 // Head to head: Busskoll's mean absolute error against SL's own prediction for the same
 // arrivals. Smaller is better. Per line, and per how many stops ahead the forecast was made.
-export default function Scoreboard({ board, compact }: { board: Board; compact?: boolean }) {
+export default function Scoreboard({ board }: { board: Board }) {
   const [pick, setPick] = useState<Line | "all">("all");
   const block = pick === "all" ? board.overall : board.lines[pick] ?? board.overall;
 
@@ -21,13 +21,13 @@ export default function Scoreboard({ board, compact }: { board: Board; compact?:
     <div>
       <div className="flex items-center justify-between gap-2">
         <span className="label text-mute">Prediction error · {board.window_days} days</span>
-        <div className="flex rounded-full bg-raise p-0.5" role="group" aria-label="Scoreboard line">
+        <div className="flex rounded-md border hairline p-0.5" role="group" aria-label="Scoreboard line">
           {(["all", ...LINES] as const).map((l) => (
             <button
               key={l}
               onClick={() => setPick(l)}
               aria-pressed={pick === l}
-              className={`label rounded-full px-2.5 py-1 transition-colors ${pick === l ? "bg-fg text-panel" : "text-mute hover:text-fg"}`}
+              className={`label rounded px-2.5 py-1 transition-colors ${pick === l ? "bg-fg text-panel" : "text-mute hover:text-fg"}`}
             >
               {l === "all" ? "All" : l}
             </button>
@@ -48,8 +48,6 @@ export default function Scoreboard({ board, compact }: { board: Board; compact?:
         )}
       </p>
 
-      {!compact && (
-        <>
           {/* Error by horizon: paired bars, Busskoll over SL, same scale. */}
           <div className="mt-5 flex items-center justify-between">
             <span className="label text-mute">By stops ahead · seconds</span>
@@ -82,15 +80,13 @@ export default function Scoreboard({ board, compact }: { board: Board; compact?:
               <span key={i} className={`h-1.5 flex-1 rounded-full ${i < block.days_beat ? "bg-accent" : "bg-fg/10"}`} />
             ))}
           </div>
-        </>
-      )}
     </div>
   );
 }
 
 function Contender({ name, value, tone, won }: { name: string; value: number; tone: string; won: boolean }) {
   return (
-    <div className={`rounded-xl border px-3 py-2.5 ${won ? "border-accent/50 bg-accent/[0.07]" : "hairline bg-raise/60"}`}>
+    <div className={`rounded-md border px-3 py-2.5 ${won ? "border-accent/50 bg-accent/[0.07]" : "hairline bg-raise/60"}`}>
       <div className="label flex items-center justify-between text-mute">
         {name}
         {won && <span className="text-accent">leads</span>}

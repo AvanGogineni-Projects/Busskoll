@@ -51,7 +51,7 @@ export default function DetailPanel({ vehicle, stop, onClose }: Props) {
 
 function Board({ kicker, title, status, onClose, children }: { kicker: ReactNode; title: ReactNode; status?: ReactNode; onClose: () => void; children: ReactNode }) {
   return (
-    <section className="overflow-hidden rounded-panel border border-white/10 bg-board text-board-fg shadow-float" aria-live="polite" aria-label="Departure board">
+    <section className="overflow-hidden rounded-md border border-white/10 bg-board text-board-fg" aria-live="polite" aria-label="Departure board">
       <header className="flex items-start justify-between gap-3 px-4 pb-3 pt-3.5">
         <div className="min-w-0">
           <div className="label truncate text-board-mute">{kicker}</div>
@@ -60,8 +60,8 @@ function Board({ kicker, title, status, onClose, children }: { kicker: ReactNode
         </div>
         <button
           onClick={onClose}
-          aria-label="Close departure board"
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/[0.06] text-board-mute transition-colors hover:bg-white/[0.12] hover:text-board-fg"
+          aria-label="Close departure board, back to fleet"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-white/[0.06] text-board-mute transition-colors hover:bg-white/[0.12] hover:text-board-fg"
         >
           <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
         </button>

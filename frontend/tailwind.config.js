@@ -30,8 +30,6 @@ export default {
         mono: ["'JetBrains Mono'", "ui-monospace", "SFMono-Regular", "monospace"],
         dot: ["Doto", "'JetBrains Mono'", "monospace"],
       },
-      borderRadius: { panel: "14px" },
-      boxShadow: { float: "0 1px 0 rgb(255 255 255 / 0.04) inset, 0 12px 40px -12px rgb(0 0 0 / 0.45)" },
     },
   },
   plugins: [],
