@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { live, type Client, type Routes, type Scoreboard, type StopDetail, type Vehicles } from "./api";
+import { live, type Arrival, type Client, type Routes, type Scoreboard, type StopDetail, type Vehicles } from "./api";
 
 export type Health = "live" | "mock" | "offline" | "loading";
 
@@ -95,4 +95,29 @@ export function useStop(client: Client | null, id: string | null, tick: number |
     return () => ac.abort();
   }, [client, id, tick]);
   return { detail: detail?.stop.stop_id === id ? detail : null, error };
+}
+
+// Every platform of one named stop (both sides of the street), merged into one board and
+// re-fetched with each vehicle poll. Fails only if every platform fails.
+export function useStopGroup(client: Client | null, ids: string[], tick: number | null) {
+  const [detail, setDetail] = useState<StopDetail | null>(null);
+  const [error, setError] = useState(false);
+  const key = ids.join(",");
+  useEffect(() => {
+    if (!client || !key) return setDetail(null);
+    const ac = new AbortController();
+    setError(false);
+    Promise.allSettled(key.split(",").map((id) => client.stop(id, ac.signal))).then((rs) => {
+      if (ac.signal.aborted) return;
+      const ok = rs.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
+      if (!ok.length) return setError(true);
+      const seen = new Set<string>();
+      const arrivals: Arrival[] = ok.flatMap((d) => d.arrivals).filter((a) => !seen.has(a.trip_id) && !!seen.add(a.trip_id));
+      arrivals.sort((a, b) => a.busskoll.localeCompare(b.busskoll));
+      const lines = [...new Set(ok.flatMap((d) => d.stop.lines))];
+      setDetail({ as_of: ok[0].as_of, stop: { ...ok[0].stop, lines }, arrivals });
+    });
+    return () => ac.abort();
+  }, [client, key, tick]);
+  return { detail, error };
 }

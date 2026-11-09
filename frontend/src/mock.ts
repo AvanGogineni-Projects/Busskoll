@@ -33,6 +33,7 @@ function clockNow() {
   const t = W0 + ((((now - W0) % (W1 - W0)) + (W1 - W0)) % (W1 - W0));
   return { t, shift: now - t };
 }
+const HISTORY_S = 45 * 60; // how far back each bus's passed stops go (the Marey chart's past)
 const iso = (s: number, shift: number) => new Date((s + shift) * 1000).toISOString();
 
 function vehiclesAt(t: number, shift: number, ahead = 5): Vehicle[] {
@@ -44,6 +45,10 @@ function vehiclesAt(t: number, shift: number, ahead = 5): Vehicle[] {
     if (last < 0 || last === trip.stops.length - 1) continue; // not started, or finished
     const passed = trip.stops[last];
     const delay = passed.actual! - passed.scheduled;
+    // Trend: the delay at the latest recorded stop at least 3 stops back.
+    let back: (typeof trip.stops)[number] | undefined;
+    for (let i = last - 3; i >= 0 && !back; i--) if (trip.stops[i].actual != null) back = trip.stops[i];
+    const trendS = back ? delay - (back.actual! - back.scheduled) : null;
     // SL's latest prediction (as of t) per stop.
     const sl = new Map<number, number>();
     for (const [ts, seq, d] of trip.sl) if (ts <= t) sl.set(seq, d);
@@ -68,8 +73,13 @@ function vehiclesAt(t: number, shift: number, ahead = 5): Vehicle[] {
       headsign: trip.headsign,
       shape_id: trip.shape_id,
       delay_s: delay,
+      delay_trend_s: trendS,
       last_stop: { stop_id: passed.stop_id, name: NAME.get(passed.stop_id) ?? "", dist_m: passed.dist_m, time: iso(passed.actual!, shift) },
       next_stops: next,
+      passed: trip.stops
+        .slice(0, last + 1)
+        .filter((s) => s.actual != null && s.actual >= t - HISTORY_S)
+        .map((s) => ({ stop_id: s.stop_id, dist_m: s.dist_m, scheduled: iso(s.scheduled, shift), actual: iso(s.actual!, shift) })),
     });
   }
   return out;

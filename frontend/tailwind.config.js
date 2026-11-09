@@ -14,24 +14,19 @@ export default {
         fg: v("fg"),
         soft: v("soft"),
         mute: v("mute"),
-        accent: v("accent"),
-        rival: v("rival"), // SL's colour in head-to-head charts
-        led: v("led"),
-        board: v("board"), // departure board: dark in both themes, like real signage
-        "board-fg": v("board-fg"),
-        "board-mute": v("board-mute"),
+        brand: v("brand"), // flag yellow: Busskoll and "now"
+        accent: v("accent"), // flag blue: the blue buses' routes, links
+        rival: v("rival"), // SL in comparisons
         early: v("early"),
         ontime: v("ontime"),
         late: v("late"),
         verylate: v("verylate"),
       },
       fontFamily: {
-        sans: ["'Instrument Sans'", "system-ui", "sans-serif"],
-        mono: ["'JetBrains Mono'", "ui-monospace", "SFMono-Regular", "monospace"],
-        dot: ["Doto", "'JetBrains Mono'", "monospace"],
+        // Overpass descends from highway-sign lettering; its mono sibling sets times and labels.
+        sans: ["Overpass", "system-ui", "sans-serif"],
+        mono: ["'Overpass Mono'", "ui-monospace", "monospace"],
       },
-      borderRadius: { panel: "14px" },
-      boxShadow: { float: "0 1px 0 rgb(255 255 255 / 0.04) inset, 0 12px 40px -12px rgb(0 0 0 / 0.45)" },
     },
   },
   plugins: [],

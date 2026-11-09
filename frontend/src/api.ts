@@ -7,8 +7,9 @@ export const API_BASE =
   (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, "") ??
   (import.meta.env.DEV ? "http://localhost:8000" : "");
 
-export const LINES = ["1", "4", "6"] as const;
-export type Line = (typeof LINES)[number];
+// A line's public number ("4", "117", "43X"). Which lines exist comes from /v1/routes, never a
+// hard-coded list, so the dashboard covers whatever the backend serves.
+export type Line = string;
 
 // One upcoming stop of a trip. Times are ISO 8601; delays are derived against `scheduled`.
 export interface StopCall {
@@ -27,7 +28,9 @@ export interface Vehicle {
   headsign: string;
   shape_id: string;
   delay_s: number; // delay at the last stop passed (+ve = late)
+  delay_trend_s: number | null; // delay now minus delay 3 stops earlier (+ve = losing time); null early in a trip
   last_stop: { stop_id: string; name: string; dist_m: number; time: string };
+  passed: { stop_id: string; dist_m: number; scheduled: string; actual: string }[]; // stops passed in the last ~45 min, oldest first
   next_stops: StopCall[]; // the next 1-5 stops, in order
 }
 

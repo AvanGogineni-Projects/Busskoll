@@ -39,6 +39,33 @@ export function pointAt({ coords, cum }: Shape, d: number): LngLat {
   return [coords[lo][0] + (coords[hi][0] - coords[lo][0]) * t, coords[lo][1] + (coords[hi][1] - coords[lo][1]) * t];
 }
 
+// Where a point sits along a shape: metres from the start to the nearest point on it, and how
+// far off the shape it is. Used to order a line's stops top to bottom on the Marey chart.
+export function project({ coords, cum }: Shape, p: LngLat): { d: number; off: number } {
+  const kx = rad(1) * Math.cos(rad(p[1])) * R;
+  const ky = rad(1) * R;
+  let best = { d: 0, off: Infinity };
+  for (let i = 0; i < coords.length - 1; i++) {
+    const ax = (coords[i][0] - p[0]) * kx, ay = (coords[i][1] - p[1]) * ky;
+    const bx = (coords[i + 1][0] - p[0]) * kx, by = (coords[i + 1][1] - p[1]) * ky;
+    const dx = bx - ax, dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2)) : 0;
+    const off = Math.hypot(ax + dx * t, ay + dy * t);
+    if (off < best.off) best = { d: cum[i] + (cum[i + 1] - cum[i]) * t, off };
+  }
+  return best;
+}
+
+// The stretch of the shape between d0 and d1 (d0 < d1): both end points plus the vertices
+// between them. Used for the light trail drawn behind each bus.
+export function sliceShape(shape: Shape, d0: number, d1: number): LngLat[] {
+  const out = [pointAt(shape, d0)];
+  for (let i = 0; i < shape.cum.length; i++) if (shape.cum[i] > d0 && shape.cum[i] < d1) out.push(shape.coords[i]);
+  out.push(pointAt(shape, d1));
+  return out;
+}
+
 // ---- time -> distance along a trip ----------------------------------------------
 // A track is the bus's last passed stop then its predicted next stops: (time s, dist m).
 export interface Knot {
@@ -99,6 +126,16 @@ export function fmtDelay(s: number): string {
   return `${sign}${Math.floor(a / 60)}:${String(a % 60).padStart(2, "0")}`;
 }
 
+// Is the bus losing time or catching up? From the change in its delay over its last few
+// stops (API field delay_trend_s); under half a minute either way counts as steady.
+export type Trend = "worse" | "steady" | "better";
+export function trend(changeS: number | null | undefined): Trend | null {
+  if (changeS == null) return null;
+  return changeS >= 30 ? "worse" : changeS <= -30 ? "better" : "steady";
+}
+export const TREND_LABEL: Record<Trend, string> = { worse: "Losing time", steady: "Steady", better: "Catching up" };
+export const TREND_ARROW: Record<Trend, string> = { worse: "↗", steady: "→", better: "↘" };
+
 export function relTime(ms: number, now = Date.now()): string {
   const s = Math.max(0, Math.round((now - ms) / 1000));
   if (s < 10) return "just now";
@@ -117,3 +154,41 @@ export function dueIn(iso: string, now = Date.now()): string {
 
 export const clock = (iso: string) =>
   new Date(iso).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Stockholm" });
+
+// ---- lines and search --------------------------------------------------------------
+// Line numbers in timetable order: 1, 4, 6, 43X, 117 (numeric where they're numbers).
+export const byLine = (a: string, b: string) => a.localeCompare(b, "sv", { numeric: true });
+
+// Case- and accent-insensitive, so "ostra" finds "Östra station".
+export const fold = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+export interface Hit {
+  kind: "line" | "stop";
+  id: string; // line number, or stop name (a stop's platforms share it)
+  label: string;
+  sub: string;
+}
+
+// Search lines (by number or destination) and stops (by name). Lines first; within each,
+// exact and prefix matches before matches inside the text.
+export function search(lines: { line: string; ends: string[] }[], stops: { name: string; lines: string[] }[], q: string, limit = 8): Hit[] {
+  const f = fold(q);
+  if (!f) return [];
+  const rank = (text: string) => (text === f ? 0 : text.startsWith(f) ? 1 : text.includes(f) ? 2 : -1);
+  const scored: { hit: Hit; r: number }[] = [];
+  for (const l of lines) {
+    const n = fold(l.line) === f ? 0 : fold(l.line).startsWith(f) ? 1 : -1; // "4" shouldn't find "14"
+    const e = Math.min(...l.ends.map((x) => rank(fold(x))).filter((r) => r >= 0).map((r) => r + 3), 99);
+    const r = n >= 0 ? n : e;
+    if (r < 99) scored.push({ hit: { kind: "line", id: l.line, label: `Line ${l.line}`, sub: l.ends.join(" – ") }, r });
+  }
+  const seen = new Set<string>();
+  for (const s of stops) {
+    if (seen.has(s.name)) continue;
+    const r = rank(fold(s.name));
+    if (r < 0) continue;
+    seen.add(s.name);
+    scored.push({ hit: { kind: "stop", id: s.name, label: s.name, sub: `Lines ${[...new Set(stops.filter((x) => x.name === s.name).flatMap((x) => x.lines))].sort(byLine).join(", ")}` }, r: r + 6 });
+  }
+  return scored.sort((a, b) => a.r - b.r || byLine(a.hit.id, b.hit.id)).slice(0, limit).map((x) => x.hit);
+}

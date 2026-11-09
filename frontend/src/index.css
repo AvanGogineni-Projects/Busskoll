@@ -2,93 +2,82 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Night transit control room: the map is the page; instruments float over it.
-   Electric blåbuss blue is Busskoll, cool slate is SL, amber LED is the departure board.
-   RGB triplets so Tailwind's /opacity modifiers work. */
+/* Busskoll's identity comes from Sweden itself: flag yellow is Busskoll (its predictions, "now"),
+   flag blue is the blue buses' routes, on a dark slate sheet. Type is Overpass, descended from
+   highway-sign lettering. SL is a quiet silver in comparisons. RGB triplets so Tailwind's
+   /opacity modifiers work. Dark is the default; light keeps the same roles. */
 :root {
   color-scheme: light;
-  --bg: 233 237 242;
+  --bg: 248 249 250;
   --panel: 255 255 255;
-  --raise: 243 245 249;
-  --edge: 15 23 42;
-  --fg: 11 18 32;
-  --soft: 51 65 85;
-  --mute: 100 116 139;
-  --accent: 31 95 224;
-  --rival: 148 163 184;
-  --led: 255 176 32;
-  --board: 11 18 32;
-  --board-fg: 230 237 247;
-  --board-mute: 120 135 160;
-  --early: 8 145 178;
-  --ontime: 22 163 74;
-  --late: 234 120 30;
-  --verylate: 225 29 72;
-  --edge-a: 0.1;
+  --raise: 240 241 243;
+  --edge: 17 19 23;
+  --fg: 17 19 23;
+  --soft: 60 64 72;
+  --mute: 108 114 125;
+  --brand: 230 170 0; /* yellow, deepened to hold up on white */
+  --accent: 0 106 167; /* flag blue */
+  --rival: 120 127 138;
+  --early: 0 106 167;
+  --ontime: 17 19 23;
+  --late: 214 108 20;
+  --verylate: 214 40 30;
+  --edge-a: 0.16;
+  --rule-a: 0.08;
 }
 
 .dark {
   color-scheme: dark;
-  --bg: 7 11 20;
-  --panel: 14 21 36;
-  --raise: 22 31 50;
-  --edge: 255 255 255;
-  --fg: 230 237 247;
-  --soft: 186 198 216;
-  --mute: 128 144 168;
-  --accent: 86 150 255;
-  --rival: 120 135 160;
-  --led: 255 176 32;
-  --board: 4 7 13;
-  --early: 103 200 255;
-  --ontime: 61 220 151;
-  --late: 255 145 64;
-  --verylate: 255 77 109;
-  --edge-a: 0.09;
+  --bg: 14 16 20;
+  --panel: 20 23 28;
+  --raise: 28 32 39;
+  --edge: 236 237 239;
+  --fg: 236 237 239;
+  --soft: 185 189 198;
+  --mute: 125 130 141;
+  --brand: 254 204 2;
+  --accent: 64 140 220;
+  --rival: 150 157 170;
+  --early: 110 168 240;
+  --ontime: 236 237 239;
+  --late: 255 138 61;
+  --verylate: 255 77 61;
+  --edge-a: 0.14;
+  --rule-a: 0.08;
 }
 
-html,
-body,
-#root {
-  height: 100%;
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 60px; /* sticky header */
 }
 
 body {
   margin: 0;
   color: rgb(var(--fg));
   background-color: rgb(var(--bg));
-  font-family: "Instrument Sans", system-ui, sans-serif;
+  font-family: Overpass, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
-  overflow: hidden; /* the map is the page; panels scroll inside themselves */
+  overflow-x: clip; /* not hidden: that would make body the scroller and break sticky + scroll reveals */
+}
+::selection {
+  background: rgb(var(--brand));
+  color: #111317;
 }
 
 .tabular {
   font-variant-numeric: tabular-nums;
 }
 .label {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 10.5px;
+  font-family: "Overpass Mono", ui-monospace, monospace;
+  font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-/* Floating instrument panel. */
-.glass {
-  background: rgb(var(--panel) / 0.92);
-  border: 1px solid rgb(var(--edge) / var(--edge-a));
-  border-radius: 14px;
-  box-shadow: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 16px 40px -16px rgb(0 0 0 / 0.5);
-  backdrop-filter: blur(14px) saturate(1.2);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
 }
 .hairline {
   border-color: rgb(var(--edge) / var(--edge-a));
 }
-/* LED glow on dot-matrix figures. */
-.led {
-  font-family: Doto, "JetBrains Mono", monospace;
-  font-weight: 900;
-  color: rgb(var(--led));
-  text-shadow: 0 0 10px rgb(var(--led) / 0.45);
+.rule {
+  border-color: rgb(var(--edge) / var(--rule-a));
 }
 
 * {
@@ -96,38 +85,78 @@ body {
   scrollbar-color: rgb(var(--mute) / 0.4) transparent;
 }
 
-/* ---- bus markers (DOM markers moved by BusMap's animation loop) ---- */
+/* ---- Marey chart ---- */
+/* Trip lines draw themselves in once (pathLength=1), predictions fade in after them. */
+.marey-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: calc(var(--i, 0) * 60ms + 0.2s);
+}
+.marey-fade {
+  opacity: 0;
+  animation: fade 0.6s ease forwards;
+  animation-delay: calc(var(--i, 0) * 60ms + 1.1s);
+}
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes fade {
+  to {
+    opacity: 1;
+  }
+}
+.delay-early { fill: rgb(var(--early)); }
+.delay-ontime { fill: rgb(var(--ontime)); }
+.delay-late { fill: rgb(var(--late)); }
+.delay-verylate { fill: rgb(var(--verylate)); }
+
+/* ---- bus markers on the map (DOM markers moved by BusMap's animation loop) ---- */
 .bus {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 9999px;
-  background: rgb(var(--panel));
-  border: 2.5px solid rgb(var(--c));
-  color: rgb(var(--c));
-  font: 700 12px/1 "JetBrains Mono", ui-monospace, monospace;
-  box-shadow: 0 0 0 3px rgb(var(--c) / 0.18), 0 4px 12px rgb(0 0 0 / 0.35);
+  background: rgb(var(--c));
+  border: 2px solid rgb(var(--bg));
+  color: rgb(var(--bg));
+  font: 800 12px/1 Overpass, system-ui, sans-serif;
+  padding-top: 1px; /* Overpass sits high */
   cursor: pointer;
-  transition: transform 0.2s, background-color 0.3s, color 0.3s, border-color 0.4s;
+  /* MapLibre positions markers with an inline transform, so effects go on opacity and outline. */
+  transition: opacity 0.5s, background-color 0.3s;
 }
-.bus:hover {
-  transform: scale(1.12);
-}
+.bus:hover,
 .bus:focus-visible,
 .bus[aria-pressed="true"] {
-  outline: none;
-  background: rgb(var(--c));
-  color: rgb(var(--panel));
-  box-shadow: 0 0 0 4px rgb(var(--c) / 0.35), 0 0 22px rgb(var(--c) / 0.6);
+  outline: 2px solid rgb(var(--brand));
+  outline-offset: 2px;
   z-index: 2;
 }
-@media (max-width: 639px) {
-  .bus {
-    width: 24px;
-    height: 24px;
-    font-size: 11px;
-  }
+.bus.dim {
+  opacity: 0.15;
+}
+.intro .bus {
+  opacity: 0;
+}
+/* Heading arrow beside the disc, pointed along the route by BusMap (--rot). */
+.bus .dir {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border-left: 6px solid rgb(var(--c));
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transform: translate(-50%, -50%) rotate(var(--rot, 0rad)) translateX(17px);
+  pointer-events: none;
+}
+.bus .num {
+  position: relative;
 }
 .bus[data-b="early"] { --c: var(--early); }
 .bus[data-b="ontime"] { --c: var(--ontime); }
@@ -135,15 +164,30 @@ body {
 .bus[data-b="verylate"] { --c: var(--verylate); }
 
 .maplibregl-ctrl-attrib {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: "Overpass Mono", ui-monospace, monospace;
   font-size: 10px !important;
 }
 
+/* The departure board slides in when a bus or stop is picked. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+.rise {
+  animation: rise 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
   *,
   *::before,
   *::after {
     transition-duration: 0s !important;
     animation-duration: 0s !important;
+    animation-delay: 0s !important;
   }
 }
