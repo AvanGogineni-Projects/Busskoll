@@ -1,5 +1,6 @@
 # Serving: what the live API needs. Vercel installs only this, so keep it small
 # (no LightGBM / pyarrow / py7zr at runtime).
+fastapi>=0.115
 httpx>=0.28
 pandas>=3.1
 gtfs-realtime-bindings>=3.0

@@ -10,6 +10,7 @@ is predicted by models trained only on the days before it.
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import numpy as np
@@ -51,9 +52,10 @@ def add_alert_counts(pts: pd.DataFrame, alerts: pd.DataFrame, routes: pd.DataFra
     return pts
 
 
-def features(tu: pd.DataFrame, truth: pd.DataFrame, alerts: pd.DataFrame, routes: pd.DataFrame) -> pd.DataFrame:
+def features(tu: pd.DataFrame, truth: pd.DataFrame, alerts: pd.DataFrame, routes: pd.DataFrame,
+             live: bool = False) -> pd.DataFrame:
     """Forecast points (see backtest.forecast_points) with every model input, all known at ts."""
-    pts = forecast_points(tu, truth)
+    pts = forecast_points(tu, truth, live=live)
     pts["persist_age"] = pts["ts"] - pts["passed_at"]
     # SL's current delay estimate for this trip: its prediction for the very next stop.
     pts["sl_now"] = pts.sort_values("horizon").groupby([*KEY, "ts"])["sl_delay"].transform("first")
@@ -136,6 +138,39 @@ def report(results: dict[str, pd.DataFrame], baselines: dict[str, pd.DataFrame])
     return "\n\n".join(parts) + "\n"
 
 
+def scoreboard(res: pd.DataFrame) -> dict:
+    """Walk-forward results -> the API's /v1/scoreboard body (without as_of)."""
+    p = res.assign(err_sl=(res["sl_delay"] - res["actual_delay"]).abs(),
+                   err_bk=(res["model_delay"] - res["actual_delay"]).abs())
+
+    def block(g: pd.DataFrame) -> dict:
+        by_h = g.groupby("horizon").agg(n=("err_sl", "size"), sl=("err_sl", "mean"), bk=("err_bk", "mean"))
+        by_d = g.groupby("day").agg(sl=("err_sl", "mean"), bk=("err_bk", "mean"))
+        return {"horizons": [{"h": int(h), "n": int(r.n), "mae_busskoll": round(float(r.bk), 1),
+                              "mae_sl": round(float(r.sl), 1)} for h, r in by_h.iterrows()],
+                "mae_busskoll": round(float(g["err_bk"].mean()), 1), "mae_sl": round(float(g["err_sl"].mean()), 1),
+                "days_scored": len(by_d), "days_beat": int((by_d["bk"] < by_d["sl"]).sum())}
+
+    return {"window_days": int(p["day"].nunique()), "overall": block(p),
+            "lines": {str(line): block(g) for line, g in p.groupby("line", observed=True)}}
+
+
+def export(out: Path) -> None:
+    """The served model and its scoreboard, both on SL's-last-report truth: live, the API only sees
+    SL's feed, so persistence and the bus ahead come from SL's reports exactly as in this training."""
+    from busskoll import trees
+
+    tu, _, alerts, _, routes = load_inputs(config.DATA_DIR / "koda")
+    pts = features(tu, ground_truth(tu), alerts, routes)
+    board = scoreboard(walk_forward(pts))
+    models = fit(pts)
+    arrays = {f"{name}.{k}": v for name, m in models.items() for k, v in trees.to_arrays(m.dump_model()).items()}
+    out.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(out / "model.npz", features=np.array(FEATURES), **arrays)
+    (out / "scoreboard.json").write_text(json.dumps(board, indent=1))
+    print(f"{out}: model.npz {(out / 'model.npz').stat().st_size / 1e6:.1f} MB, scoreboard {board['overall']}")
+
+
 def load_inputs(root: Path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     tu = load(root / "tripupdates")
     vp = load(root / "vehiclepositions")
@@ -152,7 +187,10 @@ def load_inputs(root: Path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, p
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--out", type=Path, default=Path("reports/model_backtest.md"))
+    p.add_argument("--export", type=Path, help="instead: write the served model + scoreboard to this dir")
     a = p.parse_args(argv)
+    if a.export:
+        return export(a.export)
     tu, vp, alerts, stops, routes = load_inputs(config.DATA_DIR / "koda")
     truths = {"GPS arrivals (independent)": gps_truth(tu, vp, stops), "SL's last report": ground_truth(tu)}
     results, baselines = {}, {}

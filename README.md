@@ -3,13 +3,16 @@
 Live delay predictions for Stockholm (SL) blue bus lines 1, 4 and 6, built on Trafiklab open data
 (CC0), and scored live against **SL's own predicted arrival times**.
 
-## Status: milestone 1
+## Status: milestone 3 (live)
 
 - [x] Scaffold: pyproject, ruff, pytest, CI (Python 3.12), `.env.example`
 - [x] Live GTFS-RT fetch + TripUpdates parser (`busskoll.ingest.live`)
 - [x] Resumable KoDa backfill (`busskoll.ingest.koda`)
 - [x] Walk-forward backtest of both baselines (`busskoll.eval.backtest`)
 - [x] First baseline numbers on real history ([reports/baselines.md](reports/baselines.md))
+- [x] GPS ground truth + LightGBM correction of SL, walk-forward ([reports/model_backtest.md](reports/model_backtest.md))
+- [x] Live API on Vercel (`busskoll.api`), timetable refreshed daily by a GitHub Action
+- [ ] Log live predictions vs actual arrivals (Neon) for a live track record
 
 ## Result: 23% more accurate than SL (28 days, Oct 11 – Nov 7 2026, lines 1/4/6)
 
@@ -73,10 +76,29 @@ cp .env.example .env   # add your Trafiklab keys
 .venv/bin/ruff check src tests && .venv/bin/pytest -q
 ```
 
+## Live API (`busskoll.api`, Vercel)
+
+Each refresh reads SL's TripUpdates, at most once per 90 s per server instance, plus
+ServiceAlerts every 15 min. It rebuilds the model's inputs from that one snapshot and predicts
+with the exported trees in plain NumPy, so LightGBM isn't needed at runtime. SL's feed keeps each trip's last ~5 passed stops with their final delay. That covers both persistence and the bus ahead, so no database is needed.
+
+- `src/busskoll/assets/model.npz` + `scoreboard.json`: `python -m busskoll.model --export src/busskoll/assets`
+  (trained on SL's-last-report truth, because live the API only sees SL's feed; the scoreboard is
+  that model's walk-forward backtest).
+- `src/busskoll/assets/timetable.json`: `python -m busskoll.gtfs.bundle` (trips → line/shape/headsign,
+  shapes with stop distances, stops). SL's trip_ids change with each timetable release, so
+  `.github/workflows/timetable.yml` rebuilds it every morning and commits, which redeploys.
+- Deploy: Vercel, Git integration, `vercel.json` (FastAPI service at `/v1/*` and `/health`, Vite
+  frontend for everything else). Env var on Vercel: `TRAFIKLAB_RT_KEY`. GitHub secret: `TRAFIKLAB_STATIC_KEY`.
+
+```bash
+.venv/bin/uvicorn busskoll.api:app --app-dir src --reload   # then: cd frontend && npm run dev
+```
+
 ## Call budget
 
-The realtime Bronze key allows 30k calls a month, about one every 90 s. Milestone 1 makes no
-realtime calls. KoDa takes one call per (day, hour) plus one static call per week, and asks
+The realtime Bronze key allows 30k calls a month, about one every 90 s. That's why the API refreshes at
+most every 90 s and the CDN caches `/v1/vehicles` for 90 s. KoDa takes one call per (day, hour) plus one static call per week, and asks
 users to keep only 2–3 downloads running at once; the backfill runs them one at a time.
 
 ## Dashboard (`frontend/`)

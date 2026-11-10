@@ -79,14 +79,17 @@ def gps_truth(tu: pd.DataFrame, vp: pd.DataFrame, stops: pd.DataFrame) -> pd.Dat
                     known_at=t["arrival_time"])[[*KEY, "stop_sequence", "actual_delay", "known_at", "arrival_time"]]
 
 
-def forecast_points(df: pd.DataFrame, truth: pd.DataFrame) -> pd.DataFrame:
-    """One row per (snapshot t, trip, upcoming stop at horizon 1..HORIZONS) with both baselines."""
+def forecast_points(df: pd.DataFrame, truth: pd.DataFrame, live: bool = False) -> pd.DataFrame:
+    """One row per (snapshot t, trip, upcoming stop at horizon 1..HORIZONS) with both baselines.
+    live=True keeps targets that haven't happened yet (no actual_delay): what the API serves."""
     up = df[df["arrival_time"] > df["ts"]].sort_values([*KEY, "ts", "stop_sequence"])
     up = up.assign(horizon=up.groupby([*KEY, "ts"]).cumcount() + 1)
     up = up[up["horizon"] <= HORIZONS].rename(columns={"delay": "sl_delay"})
 
-    pts = up.merge(truth[[*KEY, "stop_sequence", "actual_delay", "known_at"]], on=[*KEY, "stop_sequence"])
-    pts = pts[pts["known_at"] > pts["ts"]]  # the target must still be in the future at t
+    pts = up.merge(truth[[*KEY, "stop_sequence", "actual_delay", "known_at"]], on=[*KEY, "stop_sequence"],
+                   how="left" if live else "inner")
+    if not live:
+        pts = pts[pts["known_at"] > pts["ts"]]  # the target must still be in the future at t
 
     # Persistence: the latest stop known to be passed at t. A stop's last report only proves
     # final once the next snapshot no longer updates it, so it counts from known_at + one interval.

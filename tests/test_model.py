@@ -63,3 +63,16 @@ def test_fit_predict_learns_sl_bias_and_range_is_ordered():
     assert (res["lo"] <= res["hi"]).all()
     cover = ((res["actual_delay"] >= res["lo"]) & (res["actual_delay"] <= res["hi"])).mean()
     assert 0.7 < cover < 0.9
+
+
+def test_scoreboard_counts_days_beat_per_line_and_horizon():
+    import datetime as dt
+    d1, d2 = dt.date(2026, 11, 1), dt.date(2026, 11, 2)
+    res = pd.DataFrame({"day": [d1, d1, d2, d2], "line": pd.Categorical(["1", "1", "1", "4"]),
+                        "horizon": [1, 2, 1, 1], "actual_delay": [100, 100, 100, 100],
+                        "sl_delay": [130, 130, 100, 160], "model_delay": [110, 110, 120, 100]})
+    b = model.scoreboard(res)
+    assert b["window_days"] == 2
+    assert b["lines"]["1"]["days_scored"] == 2 and b["lines"]["1"]["days_beat"] == 1  # d1 beat, d2 lost
+    assert b["lines"]["4"]["mae_busskoll"] == 0.0 and b["lines"]["4"]["mae_sl"] == 60.0
+    assert [h["h"] for h in b["overall"]["horizons"]] == [1, 2]

@@ -1,0 +1,157 @@
+{
+ "window_days": 21,
+ "overall": {
+  "horizons": [
+   {
+    "h": 1,
+    "n": 572721,
+    "mae_busskoll": 23.7,
+    "mae_sl": 33.5
+   },
+   {
+    "h": 2,
+    "n": 516092,
+    "mae_busskoll": 25.4,
+    "mae_sl": 35.4
+   },
+   {
+    "h": 3,
+    "n": 418085,
+    "mae_busskoll": 30.0,
+    "mae_sl": 41.4
+   },
+   {
+    "h": 4,
+    "n": 312930,
+    "mae_busskoll": 35.1,
+    "mae_sl": 47.9
+   },
+   {
+    "h": 5,
+    "n": 209418,
+    "mae_busskoll": 41.7,
+    "mae_sl": 56.1
+   }
+  ],
+  "mae_busskoll": 29.0,
+  "mae_sl": 40.2,
+  "days_scored": 21,
+  "days_beat": 21
+ },
+ "lines": {
+  "1": {
+   "horizons": [
+    {
+     "h": 1,
+     "n": 201147,
+     "mae_busskoll": 22.8,
+     "mae_sl": 33.1
+    },
+    {
+     "h": 2,
+     "n": 182696,
+     "mae_busskoll": 24.7,
+     "mae_sl": 35.2
+    },
+    {
+     "h": 3,
+     "n": 147722,
+     "mae_busskoll": 30.2,
+     "mae_sl": 42.4
+    },
+    {
+     "h": 4,
+     "n": 110207,
+     "mae_busskoll": 36.4,
+     "mae_sl": 50.3
+    },
+    {
+     "h": 5,
+     "n": 69429,
+     "mae_busskoll": 44.7,
+     "mae_sl": 60.9
+    }
+   ],
+   "mae_busskoll": 29.1,
+   "mae_sl": 40.9,
+   "days_scored": 21,
+   "days_beat": 21
+  },
+  "4": {
+   "horizons": [
+    {
+     "h": 1,
+     "n": 249459,
+     "mae_busskoll": 24.0,
+     "mae_sl": 34.1
+    },
+    {
+     "h": 2,
+     "n": 224430,
+     "mae_busskoll": 25.5,
+     "mae_sl": 35.8
+    },
+    {
+     "h": 3,
+     "n": 183023,
+     "mae_busskoll": 29.6,
+     "mae_sl": 41.1
+    },
+    {
+     "h": 4,
+     "n": 137345,
+     "mae_busskoll": 34.0,
+     "mae_sl": 46.8
+    },
+    {
+     "h": 5,
+     "n": 95357,
+     "mae_busskoll": 39.8,
+     "mae_sl": 54.0
+    }
+   ],
+   "mae_busskoll": 28.8,
+   "mae_sl": 40.1,
+   "days_scored": 21,
+   "days_beat": 21
+  },
+  "6": {
+   "horizons": [
+    {
+     "h": 1,
+     "n": 122115,
+     "mae_busskoll": 24.5,
+     "mae_sl": 33.0
+    },
+    {
+     "h": 2,
+     "n": 108966,
+     "mae_busskoll": 26.2,
+     "mae_sl": 34.7
+    },
+    {
+     "h": 3,
+     "n": 87340,
+     "mae_busskoll": 30.5,
+     "mae_sl": 40.2
+    },
+    {
+     "h": 4,
+     "n": 65378,
+     "mae_busskoll": 35.2,
+     "mae_sl": 46.1
+    },
+    {
+     "h": 5,
+     "n": 44632,
+     "mae_busskoll": 40.9,
+     "mae_sl": 53.2
+    }
+   ],
+   "mae_busskoll": 29.5,
+   "mae_sl": 39.0,
+   "days_scored": 21,
+   "days_beat": 19
+  }
+ }
+}
