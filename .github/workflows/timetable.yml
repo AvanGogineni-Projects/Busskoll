@@ -1,0 +1,32 @@
+name: Timetable
+
+# SL republishes its static GTFS nightly (around 01:00) and trip_ids change with it, so the API's
+# timetable bundle is rebuilt every morning; the commit redeploys the API on Vercel.
+on:
+  schedule:
+    - cron: "30 2 * * *"  # 03:30 / 04:30 Stockholm
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e .
+      - run: python -m busskoll.gtfs.bundle
+        env:
+          TRAFIKLAB_STATIC_KEY: ${{ secrets.TRAFIKLAB_STATIC_KEY }}
+      - name: Commit if changed
+        run: |
+          git diff --quiet -- src/busskoll/assets/timetable.json && { echo "timetable unchanged"; exit 0; }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Refresh timetable from SL static GTFS" -- src/busskoll/assets/timetable.json
+          git push
