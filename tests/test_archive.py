@@ -9,7 +9,7 @@ def test_unpack_zip_and_7z(tmp_path):
     z = tmp_path / "a.zip"
     z.write_bytes(gtfs_zip())
     (tmp_path / "z").mkdir()
-    assert {p.name for p in unpack(z, tmp_path / "z")} == {"routes.txt", "trips.txt"}
+    assert {p.name for p in unpack(z, tmp_path / "z")} == {"routes.txt", "trips.txt", "stops.txt"}
 
     s = tmp_path / "a.7z"
     with py7zr.SevenZipFile(s, "w") as w:

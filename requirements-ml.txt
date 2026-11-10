@@ -2,6 +2,7 @@
 #   pip install -e ".[ml]"
 pyarrow>=26
 py7zr>=1.1
+lightgbm>=4.7
 
 # dev
 pytest>=9

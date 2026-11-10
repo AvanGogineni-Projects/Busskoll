@@ -3,7 +3,7 @@ import respx
 from google.transit import gtfs_realtime_pb2 as rt
 
 from busskoll.ingest import live
-from tests.conftest import make_feed
+from tests.conftest import make_alert_feed, make_feed, make_vp_feed
 
 SKIPPED = rt.TripUpdate.StopTimeUpdate.SKIPPED
 
@@ -42,3 +42,18 @@ def test_parse_drops_stale_trip_updates():
     pb = make_feed(10_000, [{"trip_id": "OLD", "ts": 10_000 - live.STALE_S - 1, "stops": [(1, "S1", 9000, 0)]},
                             {"trip_id": "NEW", "ts": 10_000 - live.STALE_S, "stops": [(1, "S1", 10_100, 0)]}])
     assert live.parse_trip_updates(pb)["trip_id"].tolist() == ["NEW"]
+
+
+def test_parse_vehicle_positions_keeps_our_fresh_fixes():
+    pb = make_vp_feed(10_000, [{"trip_id": "T1", "lat": 59.3, "lon": 18.0, "ts": 9_990},
+                               {"trip_id": "TX", "lat": 59.3, "lon": 18.0},
+                               {"trip_id": "T4", "lat": 59.3, "lon": 18.0, "ts": 10_000 - live.STALE_S - 1}])
+    df = live.parse_vehicle_positions(pb, {"T1", "T4"})
+    assert df[["ts", "trip_id"]].to_dict("records") == [{"ts": 9_990, "trip_id": "T1"}]
+    assert abs(df["lat"].iloc[0] - 59.3) < 1e-5
+
+
+def test_parse_alerts_one_row_per_informed_entity():
+    df = live.parse_alerts(make_alert_feed(500, {"a1": [("R1", ""), ("", "S9")], "a2": [("R4", "")]}))
+    assert df[["ts", "alert_id", "route_id", "stop_id"]].values.tolist() == [
+        [500, "a1", "R1", ""], [500, "a1", "", "S9"], [500, "a2", "R4", ""]]

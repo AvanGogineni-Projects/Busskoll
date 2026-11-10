@@ -72,3 +72,37 @@ def parse_trip_updates(pb: bytes, trip_ids: Collection[str] | None = None) -> pd
     return pd.DataFrame(rows, columns=COLUMNS).astype(
         {"ts": "int64", "stop_sequence": "int32", "arrival_time": "int64", "delay": "int32"}
     )
+
+
+VP_COLUMNS = ["ts", "trip_id", "start_date", "vehicle_id", "lat", "lon"]
+
+
+def parse_vehicle_positions(pb: bytes, trip_ids: Collection[str]) -> pd.DataFrame:
+    """GPS fixes of vehicles currently running one of `trip_ids` (ts = the fix's own time)."""
+    msg = gtfs_realtime_pb2.FeedMessage()
+    msg.ParseFromString(pb)
+    header_ts = msg.header.timestamp
+    rows = []
+    for ent in msg.entity:
+        v = ent.vehicle
+        if not ent.HasField("vehicle") or v.trip.trip_id not in trip_ids or not v.HasField("position"):
+            continue
+        ts = v.timestamp or header_ts
+        if header_ts - ts > STALE_S:
+            continue
+        rows.append((ts, v.trip.trip_id, v.trip.start_date, v.vehicle.id, v.position.latitude, v.position.longitude))
+    return pd.DataFrame(rows, columns=VP_COLUMNS).astype({"ts": "int64", "lat": "float32", "lon": "float32"})
+
+
+ALERT_COLUMNS = ["ts", "alert_id", "route_id", "stop_id", "effect"]
+
+
+def parse_alerts(pb: bytes) -> pd.DataFrame:
+    """One row per (alert, informed entity) present in the snapshot. Presence in the feed at
+    ts is what makes an alert "active" at ts, so no future active_period is needed."""
+    msg = gtfs_realtime_pb2.FeedMessage()
+    msg.ParseFromString(pb)
+    ts = msg.header.timestamp
+    rows = [(ts, ent.id, ie.route_id, ie.stop_id, ent.alert.effect)
+            for ent in msg.entity if ent.HasField("alert") for ie in ent.alert.informed_entity]
+    return pd.DataFrame(rows, columns=ALERT_COLUMNS).astype({"ts": "int64", "effect": "int16"})
