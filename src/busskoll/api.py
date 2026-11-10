@@ -1,4 +1,4 @@
-"""FastAPI service: live predictions for lines 1/4/6 from SL's realtime feed + the exported model.
+"""FastAPI service: live predictions for our lines (config.LINES) from SL's realtime feed + the exported model.
 
     uvicorn busskoll.api:app --reload        # dev (the frontend's `npm run dev` calls :8000)
 

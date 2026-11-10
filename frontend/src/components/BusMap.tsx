@@ -381,5 +381,5 @@ export default function BusMap({ routes, vehicles, lines, selected, onSelect, ho
     return () => cancelAnimationFrame(raf);
   }, [reduced]);
 
-  return <div ref={box} className="absolute inset-0" role="region" aria-label="Map of lines 1, 4 and 6 with live buses" />;
+  return <div ref={box} className="absolute inset-0" role="region" aria-label="Map of lines 1, 4, 6 and 179 with live buses" />;
 }

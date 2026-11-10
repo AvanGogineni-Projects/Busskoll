@@ -1,6 +1,6 @@
 # Busskoll
 
-Live delay predictions for Stockholm (SL) blue bus lines 1, 4 and 6, built on Trafiklab open data
+Live delay predictions for Stockholm (SL) bus lines 1, 4, 6 and 179, built on Trafiklab open data
 (CC0), and scored live against **SL's own predicted arrival times**.
 
 ## Status: milestone 3 (live)
@@ -104,7 +104,7 @@ users to keep only 2–3 downloads running at once; the backfill runs them one a
 ## Dashboard (`frontend/`)
 
 Vite + React + TypeScript + Tailwind, MapLibre GL on free CARTO vector tiles (no keys). A live
-map of lines 1/4/6 with buses eased along their GTFS shapes, a stop/bus detail panel
+map of lines 1/4/6/179 with buses eased along their GTFS shapes, a stop/bus detail panel
 (timetable vs SL vs Busskoll), and the track-record scoreboard.
 
 ```bash
