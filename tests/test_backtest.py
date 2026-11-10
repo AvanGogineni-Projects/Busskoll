@@ -58,3 +58,15 @@ def test_load_skips_empty_hours_and_backtest_runs_on_mixed_files(tmp_path):
 def test_load_without_data_explains_what_to_run(tmp_path):
     with pytest.raises(SystemExit, match="busskoll.ingest.koda"):
         backtest.load(tmp_path)
+
+
+def test_gps_truth_first_fix_within_radius_skips_terminus_and_unreached_stops():
+    tu = pd.DataFrame({"ts": [0, 0, 0], "trip_id": "T1", "start_date": "20261101", "stop_sequence": [1, 2, 3],
+                       "stop_id": ["S1", "S2", "S3"], "arrival_time": [100, 200, 300], "delay": [0, 20, 20]})
+    stops = pd.DataFrame({"stop_id": ["S1", "S2", "S3"], "lat": [59.33, 59.331, 59.332], "lon": 18.06})
+    # bus heads north ~11 m per fix, every 10 s; reaches 30 m of S2 at i=8, never gets within 30 m of S3
+    # SL's VP feed leaves start_date empty; a fix of the same trip_id a day later must not count
+    vp = pd.DataFrame({"ts": [100 + 10 * i for i in range(16)] + [86_400], "trip_id": "T1", "start_date": "",
+                       "lat": [59.33 + i * 1e-4 for i in range(16)] + [59.332], "lon": 18.06})
+    t = backtest.gps_truth(tu, vp, stops)
+    assert t[["stop_sequence", "arrival_time", "actual_delay", "known_at"]].values.tolist() == [[2, 180, 0, 180]]

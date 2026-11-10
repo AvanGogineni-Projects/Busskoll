@@ -11,6 +11,25 @@ Live delay predictions for Stockholm (SL) blue bus lines 1, 4 and 6, built on Tr
 - [x] Walk-forward backtest of both baselines (`busskoll.eval.backtest`)
 - [x] First baseline numbers on real history ([reports/baselines.md](reports/baselines.md))
 
+## Result: 23% more accurate than SL (28 days, Oct 11 – Nov 7 2026, lines 1/4/6)
+
+A LightGBM model corrects SL's own prediction, using the bus ahead on the same line,
+persistence, time of day and active alerts, all as known at the moment of the forecast.
+Walk-forward by day: every test day (Oct 18 – Nov 7, 1.7M forecasts) is predicted by a model
+trained only on earlier days. The actual arrival is the bus's first GPS fix within 30 m of the
+stop, independent of SL's reports. MAE in seconds:
+
+| Stops ahead | Persistence | SL's own prediction | **Model** |
+|---|---|---|---|
+| 1 | 54.7 | 30.6 | **23.3** |
+| 3 | 65.8 | 38.8 | **29.8** |
+| 5 | 82.3 | 53.8 | **41.8** |
+| All | 63.5 | 37.3 | **28.7** (−23%) |
+
+It beats SL on 20 of 21 test days and on every line. The day it ties is Nov 2, which has almost no data.
+Measured against SL's last report instead of GPS, it's −28%. The 80% range covers 77% of
+arrivals. Full tables: [reports/model_backtest.md](reports/model_backtest.md).
+
 ## Baselines to beat (14 days, Oct 25 – Nov 7 2026, lines 1/4/6)
 
 MAE in seconds over 1.3M forecasts (each one 1–5 stops ahead):

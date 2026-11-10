@@ -7,7 +7,7 @@ import pytest
 import respx
 
 from busskoll.ingest import koda
-from tests.conftest import gtfs_zip, make_feed
+from tests.conftest import gtfs_zip, make_alert_feed, make_feed, make_vp_feed
 
 RT = "https://api.koda.trafiklab.se/KoDa/api/v2/gtfs-rt/sl/TripUpdates"
 STATIC = "https://api.koda.trafiklab.se/KoDa/api/v2/gtfs-static/sl"
@@ -93,3 +93,27 @@ def test_safe_error_text_never_contains_the_key():
     err = httpx.HTTPStatusError("boom " + str(req.url), request=req, response=httpx.Response(500, request=req))
     assert koda.safe(err) == "HTTPStatusError 500"
     assert "koda-test" not in koda.safe(httpx.ConnectError("x " + str(req.url), request=req))
+
+
+@respx.mock
+def test_backfill_vehicle_positions_and_alerts(tmp_path):
+    vp = {f"sl/vp-{i:02d}.pb": make_vp_feed(1000 + i, [{"trip_id": "T1", "lat": 59.33, "lon": 18.06},
+                                                      {"trip_id": "T99", "lat": 59.0, "lon": 18.0}])
+          for i in range(7)}
+    al = {f"sl/al-{i}.pb": make_alert_feed(t, {"a1": [("R1", "")]} if t < 1200 else {})
+          for i, t in enumerate((1000, 1100, 1200))}
+    respx.get(STATIC).mock(return_value=httpx.Response(200, content=gtfs_zip()))
+    respx.get(RT.replace("TripUpdates", "VehiclePositions")).mock(
+        return_value=httpx.Response(200, content=seven_z(tmp_path, vp)))
+    root = tmp_path / "koda"
+    with httpx.Client() as c:
+        lines = koda.static_map(c, DAY, root)
+        assert koda.backfill_hour(c, DAY, 8, lines, root, "VehiclePositions") == 3  # every 3rd of 7 files, T1 only
+        respx.get(RT.replace("TripUpdates", "ServiceAlerts")).mock(
+            return_value=httpx.Response(200, content=seven_z(tmp_path, al)))
+        koda.backfill_hour(c, DAY, 8, lines, root, "ServiceAlerts")
+    v = pd.read_parquet(koda.hour_path(root, DAY, 8, "VehiclePositions"))
+    assert v["ts"].tolist() == [1000, 1003, 1006] and set(v["line"]) == {"1"}
+    a = pd.read_parquet(koda.hour_path(root, DAY, 8, "ServiceAlerts"))
+    assert a[["alert_id", "route_id", "first_seen", "last_seen"]].values.tolist() == [["a1", "R1", 1000, 1100]]
+    assert set(pd.read_parquet(koda.static_paths(root, dt.date(2026, 11, 2))["stops"])["stop_id"]) == {"S1", "S2"}

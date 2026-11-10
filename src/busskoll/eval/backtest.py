@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from busskoll import config
@@ -34,6 +35,48 @@ def ground_truth(df: pd.DataFrame) -> pd.DataFrame:
     return last.rename(columns={"delay": "actual_delay", "ts": "known_at"})[
         [*KEY, "stop_sequence", "actual_delay", "known_at", "arrival_time"]
     ]
+
+
+ARRIVE_RADIUS_M = 30
+TRIP_SPAN_S = 6 * 3600  # a fix belongs to a trip only within this long after the trip's start
+EARTH_R = 6_371_000.0
+
+
+def gps_truth(tu: pd.DataFrame, vp: pd.DataFrame, stops: pd.DataFrame) -> pd.DataFrame:
+    """Actual delay per (trip, stop) from GPS, independent of SL's own reports: the arrival is
+    the first fix of that trip within ARRIVE_RADIUS_M of the stop, and the delay is that minus
+    the schedule (SL's arrival_time - delay, which is constant per stop). A trip's first stop
+    is skipped: buses wait at the terminus with the trip already assigned. Same columns as
+    ground_truth, so forecast_points takes either."""
+    plan = (tu.assign(sched=tu["arrival_time"] - tu["delay"])
+              .groupby([*KEY, "stop_sequence"], as_index=False).agg(stop_id=("stop_id", "first"), sched=("sched", "median")))
+    plan = plan[plan["stop_sequence"] > plan.groupby(KEY)["stop_sequence"].transform("min")]
+    plan = plan.merge(stops[["stop_id", "lat", "lon"]], on="stop_id")
+    # SL's VehiclePositions leave start_date empty, so give each fix the start_date of the
+    # same trip_id that had started (scheduled first stop, minus an hour of layover) by then.
+    starts = (plan.groupby(KEY, as_index=False)["sched"].min().assign(t0=lambda s: (s["sched"] - 3600).astype("int64"))
+                  .sort_values("t0")[["trip_id", "start_date", "t0"]])
+    vp = pd.merge_asof(vp.drop(columns="start_date").sort_values("ts"), starts, left_on="ts", right_on="t0",
+                       by="trip_id", direction="backward", tolerance=TRIP_SPAN_S).dropna(subset=["start_date"])
+    fixes = {k: g for k, g in vp.groupby(KEY)}
+    out = []
+    for k, st in plan.groupby(KEY):
+        g = fixes.get(k)
+        if g is None:
+            continue
+        lat0 = np.radians(st["lat"].to_numpy(float))[:, None]
+        dy = (np.radians(g["lat"].to_numpy(float))[None, :] - lat0) * EARTH_R
+        dx = (np.radians(g["lon"].to_numpy(float))[None, :] - np.radians(st["lon"].to_numpy(float))[:, None]) \
+            * np.cos(lat0) * EARTH_R
+        near = np.hypot(dx, dy) <= ARRIVE_RADIUS_M  # stops x fixes
+        hit = near.any(axis=1)
+        arrival = g["ts"].to_numpy()[near.argmax(axis=1)]
+        out.append(st.loc[hit, [*KEY, "stop_sequence", "sched"]].assign(arrival_time=arrival[hit]))
+    if not out:
+        return pd.DataFrame(columns=[*KEY, "stop_sequence", "actual_delay", "known_at", "arrival_time"])
+    t = pd.concat(out, ignore_index=True)
+    return t.assign(actual_delay=(t["arrival_time"] - t["sched"]).round().astype("int64"),
+                    known_at=t["arrival_time"])[[*KEY, "stop_sequence", "actual_delay", "known_at", "arrival_time"]]
 
 
 def forecast_points(df: pd.DataFrame, truth: pd.DataFrame) -> pd.DataFrame:
