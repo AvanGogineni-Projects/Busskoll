@@ -153,7 +153,8 @@ def _snapshot() -> dict:
     try:
         return LIVE.get()
     except httpx.HTTPError as e:  # never echo the error: the request URL carries the API key
-        raise HTTPException(status_code=503, detail=f"SL realtime feed unavailable ({type(e).__name__})") from None
+        why = f"HTTP {e.response.status_code}" if isinstance(e, httpx.HTTPStatusError) else type(e).__name__
+        raise HTTPException(status_code=503, detail=f"SL realtime feed unavailable ({why})") from None
 
 
 @app.get("/health")
