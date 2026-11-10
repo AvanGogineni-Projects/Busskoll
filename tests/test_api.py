@@ -75,3 +75,15 @@ def test_feed_outage_is_a_503_without_the_key(client, monkeypatch):
     monkeypatch.setattr(api.live, "fetch", down)
     r = client.get("/v1/vehicles")
     assert r.status_code == 503 and "SECRET" not in r.text and "cache-control" not in r.headers
+
+
+def test_feed_rejection_reports_sls_status_code(client, monkeypatch):
+    import httpx
+
+    def rejected(feed_name, c=None):
+        req = httpx.Request("GET", "https://opendata.samtrafiken.se/x.pb?key=SECRET")
+        raise httpx.HTTPStatusError("401", request=req, response=httpx.Response(401, request=req))
+
+    monkeypatch.setattr(api.live, "fetch", rejected)
+    r = client.get("/v1/vehicles")
+    assert r.status_code == 503 and "HTTP 401" in r.text and "SECRET" not in r.text
