@@ -10,7 +10,7 @@ load_dotenv()
 
 OPERATOR = "sl"
 # Busy blue bus lines (route_short_name). Metro is out of scope: its positions are less precise.
-LINES = ("1", "4", "6")
+LINES = ("1", "4", "6", "179")
 DATA_DIR = Path(os.environ.get("BUSSKOLL_DATA_DIR", "data"))
 
 
