@@ -2,7 +2,7 @@
 
     uvicorn busskoll.api:app --reload        # dev (the frontend's `npm run dev` calls :8000)
 
-The API never trains. Each refresh reads SL's TripUpdates (and, less often, ServiceAlerts),
+The API never trains. Each refresh reads SL's TripUpdates and VehiclePositions (and, less often, ServiceAlerts),
 rebuilds the model's inputs from that single snapshot, and runs the model in NumPy (trees.py).
 SL's feed keeps each trip's last ~5 passed stops with their final delay, which is all that
 persistence and the bus ahead need, so no database is involved.
@@ -27,7 +27,8 @@ from busskoll.ingest import live
 from busskoll.model import FEATURES, features
 
 ASSETS = Path(__file__).resolve().parent / "assets"
-REFRESH_S = 90  # one TripUpdates call per 90 s at most keeps us inside Trafiklab's 30k/month quota
+# Two calls (TripUpdates + VehiclePositions) per 180 s at most: ~28.8k/month, inside Trafiklab Bronze's 30k.
+REFRESH_S = 180
 ALERTS_EVERY_S = 900
 
 app = FastAPI(title="Busskoll")
@@ -79,9 +80,12 @@ def predict(tu: pd.DataFrame, alerts: pd.DataFrame) -> pd.DataFrame:
     return pts.assign(model_delay=pts["sl_delay"] + resid)
 
 
-def vehicles(tu: pd.DataFrame, pred: pd.DataFrame) -> list[dict]:
-    """The API's Vehicle objects (see frontend/src/api.ts)."""
+def vehicles(tu: pd.DataFrame, pred: pd.DataFrame, vp: pd.DataFrame | None = None) -> list[dict]:
+    """The API's Vehicle objects (see frontend/src/api.ts). `vp` adds each trip's latest GPS fix."""
     names = {s: v["name"] for s, v in STOPS.items()}
+    # by trip_id alone: SL's VehiclePositions leaves start_date empty
+    fixes = ({} if vp is None or vp.empty else
+             vp.sort_values("ts").groupby("trip_id").last()[["ts", "lat", "lon"]].to_dict("index"))
     ours = pred.set_index([*KEY, "stop_sequence"])["model_delay"].to_dict() if len(pred) else {}
     out = []
     for (trip_id, start_date), g in tu.sort_values("stop_sequence").groupby(KEY):
@@ -95,6 +99,7 @@ def vehicles(tu: pd.DataFrame, pred: pd.DataFrame) -> list[dict]:
         last = done.iloc[-1]
         back = done.iloc[-4] if len(done) >= 4 else None
         sched = lambda r: int(r.arrival_time - r.delay)
+        fix = fixes.get(trip_id)
         out.append({
             "vehicle_id": str(last.vehicle_id), "trip_id": trip_id, "line": line, "headsign": headsign,
             "shape_id": shape_id, "delay_s": int(last.delay),
@@ -105,6 +110,9 @@ def vehicles(tu: pd.DataFrame, pred: pd.DataFrame) -> list[dict]:
             # (Neon, next milestone) to show a longer history.
             "passed": [{"stop_id": r.stop_id, "dist_m": dist[r.stop_id], "scheduled": _iso(sched(r)),
                         "actual": _iso(r.arrival_time)} for r in done.itertuples()],
+            # where the bus really is (null without a fix): the map trusts this over the predicted times
+            "gps": {"lat": round(float(fix["lat"]), 5), "lon": round(float(fix["lon"]), 5), "time": _iso(fix["ts"])}
+                   if fix else None,
             "next_stops": [{
                 "stop_id": r.stop_id, "name": names.get(r.stop_id, ""), "dist_m": dist[r.stop_id],
                 "scheduled": _iso(sched(r)), "sl": _iso(r.arrival_time),
@@ -139,9 +147,13 @@ class _Live:
                         except httpx.HTTPError:
                             pass  # alerts are one input among many: keep the last copy
                     tu = live.parse_trip_updates(live.fetch("TripUpdates", c), TT["trips"].keys())
+                    try:
+                        vp = live.parse_vehicle_positions(live.fetch("VehiclePositions", c), TT["trips"].keys())
+                    except httpx.HTTPError:
+                        vp = None  # positions are a nicety: the map falls back to predicted times
                 tu = tu.assign(line=tu["trip_id"].map(lambda t: TT["trips"][t][0]))
                 as_of = int(tu["ts"].max()) if len(tu) else int(now)
-                self.data = {"as_of": _iso(as_of), "vehicles": vehicles(tu, predict(tu, self.alerts))}
+                self.data = {"as_of": _iso(as_of), "vehicles": vehicles(tu, predict(tu, self.alerts), vp)}
                 self.at = now
             return self.data
 

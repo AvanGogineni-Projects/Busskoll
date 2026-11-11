@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { MotionConfig, motion } from "framer-motion";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import type { Line, ScoreBlock, Vehicle } from "./api";
 import AnimatedNumber from "./components/AnimatedNumber";
 import BusMap, { type Selection } from "./components/BusMap";
@@ -40,6 +40,34 @@ const Mark = ({ size = 22 }: { size?: number }) => (
     <path d="M5 5 L11 12 L13 19" className="fill-none stroke-bg" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
     <path d="M11 5 L17 13 L19 19" className="fill-none stroke-brand" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
+);
+
+// First-load splash: a bus drives a short route, waiting at each stop, until the first
+// snapshot is in. Shown only while the very first poll is pending (health "loading").
+const Loading = () => (
+  <motion.div
+    className="fixed inset-0 z-50 grid place-items-center bg-bg px-4"
+    role="status"
+    aria-live="polite"
+    exit={{ opacity: 0 }}
+    transition={{ duration: 0.4 }}
+  >
+    <div className="w-full max-w-xs">
+      <div className="flex items-center gap-2.5">
+        <Mark />
+        <span className="pt-0.5 text-[19px] font-extrabold tracking-[-0.02em] text-fg">Busskoll</span>
+      </div>
+      <div className="relative mt-8 h-6" aria-hidden="true">
+        <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-accent" />
+        {[0, 1, 2, 3].map((i) => (
+          <span key={i} className={`ld-stop ld-stop-${i}`} style={{ left: `${(i * 100) / 3}%` }} />
+        ))}
+        <span className="ld-bus" />
+      </div>
+      <div className="label mt-6 text-soft">Fetching live buses from SL…</div>
+      <p className="ld-late mt-2 text-[13px] leading-relaxed text-mute">Waking the server. The first load can take a few seconds.</p>
+    </div>
+  </motion.div>
 );
 
 const Reveal = ({ children, className = "", delay = 0 }: { children: ReactNode; className?: string; delay?: number }) => (
@@ -516,6 +544,7 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion="user">
+      <AnimatePresence>{health === "loading" && <Loading key="loading" />}</AnimatePresence>
       <div className="min-h-[100dvh] bg-bg">
         <header className="sticky top-0 z-30 border-b hairline bg-bg/90 backdrop-blur">
           <div className="mx-auto flex h-14 max-w-7xl items-center gap-5 px-4 lg:px-8">

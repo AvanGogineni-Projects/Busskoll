@@ -15,7 +15,7 @@ export default function DetailPanel({ vehicle, stop, onClose }: Props) {
     const t = trend(vehicle.delay_trend_s);
     return (
       <Board
-        kicker={<>Bus {vehicle.vehicle_id.slice(-4)} · passed {vehicle.last_stop.name || "last stop"} at {clock(vehicle.last_stop.time)}</>}
+        kicker={<>Bus {vehicle.vehicle_id.slice(-4)} · passed {vehicle.last_stop.name || "last stop"} at {clock(vehicle.last_stop.time)}{vehicle.gps ? ` · GPS ${clock(vehicle.gps.time)}` : ""}</>}
         title={<><Badge line={vehicle.line} /> <span className="truncate">{vehicle.headsign}</span></>}
         status={
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">

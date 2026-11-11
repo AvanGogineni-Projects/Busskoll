@@ -49,7 +49,7 @@ def make_vp_feed(header_ts: int, vehicles: list[dict]) -> bytes:
     for i, v in enumerate(vehicles):
         vp = msg.entity.add(id=str(i)).vehicle
         vp.trip.trip_id = v["trip_id"]
-        vp.trip.start_date = "20261101"
+        vp.trip.start_date = v.get("start_date", "")  # SL leaves it empty
         vp.vehicle.id = v.get("vehicle", f"v{i}")
         vp.position.latitude, vp.position.longitude = v["lat"], v["lon"]
         vp.timestamp = v.get("ts", header_ts)

@@ -179,7 +179,54 @@ body {
   animation: rise 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* ---- first-load splash (App.tsx Loading): a bus that dwells at each stop ---- */
+.ld-stop,
+.ld-bus {
+  position: absolute;
+  top: 50%;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+}
+.ld-stop {
+  width: 12px;
+  height: 12px;
+  background: rgb(var(--bg));
+  border: 2.5px solid rgb(var(--accent));
+}
+.ld-stop-0 { border-color: rgb(var(--brand)); }
+.ld-stop-1 { animation: ld-lit-1 4s linear infinite; }
+.ld-stop-2 { animation: ld-lit-2 4s linear infinite; }
+.ld-stop-3 { animation: ld-lit-3 4s linear infinite; }
+.ld-bus {
+  width: 22px;
+  height: 22px;
+  background: rgb(var(--brand));
+  border: 2.5px solid rgb(var(--bg));
+  animation: ld-drive 4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+/* drive, dwell, drive, dwell...: the same 4 s cycle as the stops lighting up */
+@keyframes ld-drive {
+  0%, 12% { left: 0%; opacity: 1; }
+  30%, 42% { left: 33.333%; }
+  60%, 72% { left: 66.667%; }
+  90%, 96% { left: 100%; opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+@keyframes ld-lit-1 { 0%, 29.9% { border-color: rgb(var(--accent)); } 30%, 99.9% { border-color: rgb(var(--brand)); } }
+@keyframes ld-lit-2 { 0%, 59.9% { border-color: rgb(var(--accent)); } 60%, 99.9% { border-color: rgb(var(--brand)); } }
+@keyframes ld-lit-3 { 0%, 89.9% { border-color: rgb(var(--accent)); } 90%, 99.9% { border-color: rgb(var(--brand)); } }
+/* only shown if the first load is slow (Vercel cold start + SL's feed) */
+.ld-late {
+  opacity: 0;
+  animation: fade 0.6s ease 5s forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .ld-bus,
+  .ld-stop {
+    animation: none;
+  }
+
   html {
     scroll-behavior: auto;
   }
