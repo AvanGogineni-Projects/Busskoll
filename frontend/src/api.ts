@@ -32,6 +32,7 @@ export interface Vehicle {
   last_stop: { stop_id: string; name: string; dist_m: number; time: string };
   passed: { stop_id: string; dist_m: number; scheduled: string; actual: string }[]; // stops passed in the last ~45 min, oldest first
   next_stops: StopCall[]; // the next 1-5 stops, in order
+  gps?: { lat: number; lon: number; time: string } | null; // latest GPS fix; absent in the dev replay
 }
 
 export interface Vehicles {

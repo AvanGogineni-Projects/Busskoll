@@ -1,7 +1,7 @@
 // Assert-based check for the pure helpers (no test runner in the frontend):
 //   npm run check
 import assert from "node:assert/strict";
-import { byLine, search, bucket, dueIn, buildShape, distAt, fmtDelay, metres, monotonic, pointAt, project, sliceShape, trend } from "../src/lib.ts";
+import { byLine, search, bucket, dueIn, buildShape, distAt, fmtDelay, metres, monotonic, pointAt, project, sliceShape, trackFrom, trend } from "../src/lib.ts";
 
 const near = (a: number, b: number, tol: number) => assert.ok(Math.abs(a - b) <= tol, `${a} !~ ${b}`);
 
@@ -71,3 +71,18 @@ assert.deepEqual(search(L, S, "ostra").map((h) => h.kind + h.id), ["line43X", "s
 assert.equal(search(L, S, "ostra")[1].sub, "Lines 1, 4"); // a stop's platforms merged
 assert.deepEqual(search(L, S, "  "), []);
 console.log("lib checks passed");
+
+// Track from GPS: starts at the fix, skips stops already driven past; a fix off the route is ignored.
+{
+  const iso = (t: number) => new Date(t * 1000).toISOString();
+  const last = { time: iso(1000), dist_m: 0 };
+  const next = [{ busskoll: iso(1100), dist_m: 300 }, { busskoll: iso(1200), dist_m: 900 }];
+  const g = trackFrom(last, next, shape, { lat: 59.33, lon: 18.01, time: iso(1050) }); // fix at the 568 m vertex
+  assert.equal(g.length, 2); // the 300 m stop is behind the bus
+  near(g[0].d, leg, 1); assert.equal(g[0].t, 1050);
+  assert.deepEqual(g[1], { t: 1200, d: 900 });
+  const off = trackFrom(last, next, shape, { lat: 59.34, lon: 18.01, time: iso(1050) }); // ~1.1 km off the street
+  assert.deepEqual(off, [{ t: 1000, d: 0 }, { t: 1100, d: 300 }, { t: 1200, d: 900 }]);
+  assert.deepEqual(trackFrom(last, next, shape, null), off);
+  near(project(shape, [18.005, 59.33], 700).d, leg, 1); // `from` skips the earlier segment: lands on the later one
+}

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from tests.conftest import make_alert_feed, make_feed
+from tests.conftest import make_alert_feed, make_feed, make_vp_feed
 
 api = pytest.importorskip("busskoll.api")
 
@@ -34,9 +34,11 @@ def client(monkeypatch):
     monkeypatch.setattr(api, "STOPS", {s["stop_id"]: s for s in tt["stops"]})
     monkeypatch.setattr(api, "MODELS", {"point": PLUS_30})
     monkeypatch.setattr(api, "LIVE", api._Live())
+    vp = make_vp_feed(T0, [{"trip_id": "T1", "lat": 59.3, "lon": 18.05, "ts": T0 - 10}])
+    feeds = {"TripUpdates": feed, "VehiclePositions": vp}
     calls = []
     monkeypatch.setattr(api.live, "fetch", lambda feed_name, c=None: calls.append(feed_name) or (
-        feed if feed_name == "TripUpdates" else make_alert_feed(T0, {})))
+        feeds.get(feed_name) or make_alert_feed(T0, {})))
     c = TestClient(api.app)
     c.calls = calls
     return c
@@ -53,6 +55,22 @@ def test_vehicles_use_the_model_for_scored_stops_and_sl_otherwise(client):
     assert s3["sl"] == api._iso(T0 + 100) and s3["busskoll"] == api._iso(T0 + 100 + 30)  # SL + model's +30 s
     assert s4["scheduled"] == api._iso(T0 + 300 - 90) and s4["busskoll"] == api._iso(T0 + 300 + 30)
     assert [p["stop_id"] for p in t1["passed"]] == ["S1", "S2"]
+    assert t1["gps"] == {"lat": 59.3, "lon": 18.05, "time": api._iso(T0 - 10)}
+
+
+def test_vehicles_survive_a_positions_outage_without_gps(client, monkeypatch):
+    import httpx
+
+    fetch = api.live.fetch
+
+    def no_positions(feed_name, c=None):
+        if feed_name == "VehiclePositions":
+            raise httpx.ConnectError("down")
+        return fetch(feed_name, c)
+
+    monkeypatch.setattr(api.live, "fetch", no_positions)
+    v = client.get("/v1/vehicles").json()["vehicles"]
+    assert [x["trip_id"] for x in v] == ["T1"] and v[0]["gps"] is None
 
 
 def test_stop_detail_routes_and_caching_of_the_feed(client):
@@ -62,7 +80,7 @@ def test_stop_detail_routes_and_caching_of_the_feed(client):
     routes = client.get("/v1/routes").json()
     assert [r["line"] for r in routes["routes"]] == ["1", "4"] and len(routes["stops"]) == 4
     client.get("/v1/vehicles")
-    assert client.calls.count("TripUpdates") == 1  # one feed call serves every endpoint until REFRESH_S
+    assert client.calls.count("TripUpdates") == client.calls.count("VehiclePositions") == 1  # one feed call serves every endpoint until REFRESH_S
     assert "overall" in client.get("/v1/scoreboard").json()
 
 

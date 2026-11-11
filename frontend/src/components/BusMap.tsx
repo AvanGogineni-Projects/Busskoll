@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import maplibregl, { type ExpressionSpecification, type GeoJSONSource, type Map as MLMap } from "maplibre-gl";
 import type { Line, Routes, Vehicle, Vehicles } from "../api";
-import { BUCKET_LABEL, bucket, buildShape, distAt, easeInOut, fmtDelay, monotonic, pointAt, sliceShape, type Bucket, type Knot, type Shape } from "../lib";
+import { BUCKET_LABEL, bucket, buildShape, distAt, easeInOut, fmtDelay, pointAt, sliceShape, trackFrom, type Bucket, type Knot, type Shape } from "../lib";
 import { MAP_PAINT, useTheme, type MapPaint } from "../theme";
 
 export type Selection = { kind: "bus" | "stop"; id: string } | null;
@@ -18,7 +18,7 @@ interface Props {
 }
 
 // One bus on screen. Its position is a pure function of time: distance along its shape from
-// its track (last stop passed -> predicted next stops), so it keeps moving between the
+// its track (latest GPS fix, else last stop passed -> predicted next stops), so it keeps moving between the
 // once-a-minute polls. A new poll doesn't teleport it: for BLEND_MS it eases from where it
 // was drawn to where the new track says it is.
 interface Anim {
@@ -66,9 +66,7 @@ function tint(m: MLMap, p: MapPaint) {
   }
 }
 
-const sec = (iso: string) => Date.parse(iso) / 1000;
-const trackOf = (v: Vehicle) =>
-  monotonic([{ t: sec(v.last_stop.time), d: v.last_stop.dist_m }, ...v.next_stops.map((c) => ({ t: sec(c.busskoll), d: c.dist_m }))]);
+const trackOf = (v: Vehicle, shape: Shape) => trackFrom(v.last_stop, v.next_stops, shape, v.gps);
 
 function distNow(a: Anim, ms: number, reduced: boolean) {
   const target = distAt(a.track, ms / 1000);
@@ -294,7 +292,7 @@ export default function BusMap({ routes, vehicles, lines, selected, onSelect, ho
       if (a) {
         a.from = distNow(a, now, latest.current.reduced);
         a.since = now;
-        a.track = trackOf(v);
+        a.track = trackOf(v, shape);
       } else {
         const el = document.createElement("button");
         el.type = "button";
@@ -304,7 +302,7 @@ export default function BusMap({ routes, vehicles, lines, selected, onSelect, ho
           e.stopPropagation();
           latest.current.onSelect({ kind: "bus", id: v.vehicle_id });
         });
-        const track = trackOf(v);
+        const track = trackOf(v, shape);
         const marker = new maplibregl.Marker({ element: el }).setLngLat(pointAt(shape, distAt(track, now / 1000))).addTo(m);
         a = { el, marker, shape, shapeId: v.shape_id, track, from: null, since: now };
         anims.current.set(v.vehicle_id, a);

@@ -41,11 +41,14 @@ export function pointAt({ coords, cum }: Shape, d: number): LngLat {
 
 // Where a point sits along a shape: metres from the start to the nearest point on it, and how
 // far off the shape it is. Used to order a line's stops top to bottom on the Marey chart.
-export function project({ coords, cum }: Shape, p: LngLat): { d: number; off: number } {
+// `from` skips the shape before that distance, so a route that uses the same street twice
+// places a bus on the pass it is actually on.
+export function project({ coords, cum }: Shape, p: LngLat, from = -Infinity): { d: number; off: number } {
   const kx = rad(1) * Math.cos(rad(p[1])) * R;
   const ky = rad(1) * R;
   let best = { d: 0, off: Infinity };
   for (let i = 0; i < coords.length - 1; i++) {
+    if (cum[i + 1] < from) continue;
     const ax = (coords[i][0] - p[0]) * kx, ay = (coords[i][1] - p[1]) * ky;
     const bx = (coords[i + 1][0] - p[0]) * kx, by = (coords[i + 1][1] - p[1]) * ky;
     const dx = bx - ax, dy = by - ay;
@@ -96,6 +99,22 @@ export function distAt(track: Knot[], t: number): number {
     }
   }
   return track[track.length - 1].d;
+}
+
+// A bus's track. With a GPS fix it starts where the bus really was at that moment and drops
+// stops it has already driven past; otherwise it starts at the last stop SL reports passed.
+// A fix too far off the route (detour, bad GPS) is ignored.
+export const GPS_MAX_OFF_M = 80;
+export function trackFrom(
+  last: { time: string; dist_m: number },
+  next: { busskoll: string; dist_m: number }[],
+  shape: Shape,
+  gps?: { lat: number; lon: number; time: string } | null,
+): Knot[] {
+  const sec = (iso: string) => Date.parse(iso) / 1000;
+  const fix = gps ? project(shape, [gps.lon, gps.lat], last.dist_m - 300) : null;
+  const start = fix && fix.off <= GPS_MAX_OFF_M ? { t: sec(gps!.time), d: fix.d } : { t: sec(last.time), d: last.dist_m };
+  return monotonic([start, ...next.filter((c) => c.dist_m > start.d).map((c) => ({ t: sec(c.busskoll), d: c.dist_m }))]);
 }
 
 export const easeInOut = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2);
